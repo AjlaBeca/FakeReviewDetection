@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fake Review Detector</title>
+    <link rel="stylesheet" href="popup.css">
+    <script src="popup.js" defer></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Fake Review Detector</h1>
+            <p class="subtitle">Identify AI-generated content with advanced detection</p>
+        </header>
+        
+        <div class="main-content">
+            <button id="analyzeBtn" class="btn btn-primary">
+                Analyze Selected Text
+            </button>
+            
+            <button id="historyBtn" class="btn btn-secondary">
+                View History
+            </button>
+            
+            <div id="result" class="result-container">
+                <h2 class="result-title">
+                    <i>🔍</i> Analysis Result
+                </h2>
+                <div id="resultContent" class="result-content">
+                    <!-- Results will be displayed here -->
+                </div>
+            </div>
+            
+            <div id="history" class="history-container">
+                <div class="history-title">
+                    <h2><i>📚</i> Analysis History</h2>
+                </div>
+                <div id="historyContent">
+                    <!-- History items will be displayed here -->
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            Fake Review Detector v1.0 &copy; 2023
+        </div>
+    </div>
+</body>
+</html>
