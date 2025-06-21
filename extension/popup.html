@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Fake Review Detector</title>
+    <script src="popup.js" defer></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 16px;
+            width: 300px;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+
+        h1 {
+            font-size: 18px;
+            margin-bottom: 12px;
+            text-align: center;
+        }
+
+        button {
+            background-color: #a200ff;
+            color: white;
+            border: none;
+            padding: 10px;
+            font-size: 14px;
+            width: 100%;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #8a00d4;
+        }
+
+        #result {
+            margin-top: 16px;
+            background-color: #ffffff;
+            padding: 12px;
+            border-radius: 6px;
+            box-shadow: 0 0 6px rgba(0,0,0,0.1);
+        }
+
+        .label {
+            font-weight: bold;
+        }
+
+        .fake {
+            color: #e53935;
+        }
+
+        .real {
+            color: #43a047;
+        }
+
+        .confidence-bar {
+            height: 8px;
+            border-radius: 4px;
+            background-color: #ddd;
+            margin-bottom: 10px;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            border-radius: 4px;
+        }
+
+        /*.roberta .confidence-fill {
+            background-color: #2196F3;
+        }
+
+        .ai .confidence-fill {
+            background-color: #FF9800;
+        }
+        */
+
+        .progress-label {
+            font-size: 12px;
+            margin-bottom: 4px;
+        }
+
+        #historyBtn {
+            background-color: #2196F3;
+        }
+        #historyBtn:hover {
+            background-color: #1976D2;
+        }
+        #history {
+            margin-top: 16px;
+            max-height: 200px;
+            overflow-y: auto;
+            background-color: #ffffff;
+            padding: 12px;
+            border-radius: 6px;
+            box-shadow: 0 0 6px rgba(0,0,0,0.1);
+        }
+
+        .history-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .history-item .label {
+            font-weight: bold;
+        }
+
+        .history-item .confidence-bar {
+            margin-top: 4px;
+        }
+
+        .history-item .confidence-fill {
+            height: 6px;
+        }
+
+        .history-item .roberta .confidence-fill {
+            background-color: #2196F3;
+        }
+
+        .history-item .ai .confidence-fill {
+            background-color: #FF9800;
+        }
+
+        .history-item .fake { color: #e53935; }
+
+        .history-item .real { color: #43a047; }
+        .history-item .roberta { color: #2196F3; }
+        .history-item .ai { color: #FF9800; }
+        .history-item .human { color: #9E9E9E; }
+        .roberta { color: blue; font-weight: bold; }
+        .confidence-label { font-size: 12px; margin-top: 4px; }
+        .confidence-value { font-weight: bold; }
+        .roberta { color: blue; font-weight: bold; }
+        .ai { color: red; font-weight: bold;   }
+        .human { color: green; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Fake Review Detector</h1>
+    <button id="analyzeBtn">Analyze Selected Text</button>
+    <br><br>
+    <button id="historyBtn">View History</button>
+    <div id="result"></div>
+    <div id="history"></div>
+</body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "manifest_version": 2,
+  "name": "Fake Review Detector",
+  "version": "1.0",
+  "description": "Detects if highlighted reviews are fake or AI-generated.",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "contextMenus"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:8000/*"
+  ],
+  "browser_action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": false
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ]
+}
