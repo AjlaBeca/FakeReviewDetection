@@ -361,3 +361,90 @@ h1 {
     color: #1565c0;
     font-weight: bold;
 }
+
+/* Explanation toggle */
+.explanation-toggle {
+    margin-top: 15px;
+    text-align: center;
+}
+
+.btn-tertiary {
+    background: linear-gradient(to right, #6a11cb, #2575fc);
+    color: white;
+    padding: 8px 15px;
+    font-size: 14px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-tertiary:hover {
+    opacity: 0.9;
+    transform: translateY(-2px);
+}
+
+.explanation-section {
+    margin-top: 15px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    border-left: 3px solid #6a11cb;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+/* Feature impact indicators */
+.feature-impact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 15px;
+}
+
+.feature-item {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.ai-impact {
+    background-color: #ffebee;
+    color: #c62828;
+}
+
+.human-impact {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+}
+
+.impact-bar {
+    width: 30px;
+    height: 6px;
+    border-radius: 3px;
+    background-color: #e0e0e0;
+    overflow: hidden;
+    margin-left: 5px;
+}
+
+.impact-fill {
+    height: 100%;
+}
+
+.ai-fill {
+    background-color: #c62828;
+}
+
+.human-fill {
+    background-color: #2e7d32;
+}
+
+/* Threshold indicator */
+.threshold-note {
+    font-size: 12px;
+    color: #666;
+    margin-top: 10px;
+    text-align: center;
+}

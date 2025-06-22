@@ -1,8 +1,11 @@
 from transformers import RobertaTokenizer, RobertaForSequenceClassification
 import torch
-import shap
 from lime import lime_text
-import numpy as np
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 tokenizer_roberta = RobertaTokenizer.from_pretrained("roberta_finetuned")
 model_roberta = RobertaForSequenceClassification.from_pretrained(
@@ -12,52 +15,77 @@ model_roberta = RobertaForSequenceClassification.from_pretrained(
 )
 model_roberta.eval()
 
-explainer_shap = shap.Explainer(model_roberta, tokenizer_roberta)
-explainer_lime = lime_text.LimeTextExplainer(class_names=["CG", "OR"])
-
 def predict_roberta(text):
     inputs = tokenizer_roberta(text, return_tensors="pt", truncation=True, padding=True, max_length=256)
     with torch.no_grad():
         outputs = model_roberta(**inputs)
         logits = outputs.logits
-        probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
+        
+        # Apply temperature scaling to calibrate confidence
+        scaled_logits = logits / TEMPERATURE
+        
+        probs = torch.softmax(scaled_logits, dim=1)[0].cpu().numpy()
         predicted_class = probs.argmax()
         confidence = float(probs[predicted_class])
+        
     label = "CG" if predicted_class == 0 else "OR"
-    return {"label": label, "confidence": confidence, "class_probabilities": {"CG": float(probs[0]), "OR": float(probs[1])}}
+    return {
+        "label": label,
+        "confidence": confidence,
+        "class_probabilities": {
+            "CG": float(probs[0]),
+            "OR": float(probs[1])
+        }
+    }
+
+TEMPERATURE = 2.0  # Define temperature as a constant
+
 def explain_roberta(text):
-    """Generate LIME explanations only"""
+    """Generate LIME explanations with optimizations"""
     try:
-        # LIME explanation
+        # Truncate text to first 100 words for faster processing
+        words = text.split()
+        truncated_text = " ".join(words[:100])
+        
+        # LIME explanation with reduced samples
         explainer_lime = lime_text.LimeTextExplainer(class_names=["CG", "OR"])
         
+        # Pre-tokenize to get token count for dynamic feature setting
+        tokens = tokenizer_roberta.tokenize(truncated_text)
+        num_features = min(8, len(tokens))  # Use at most 8 features
+        
         def classifier_fn(texts):
+            # Preprocess multiple texts
             inputs = tokenizer_roberta(
                 texts, 
                 return_tensors="pt", 
                 truncation=True, 
                 padding=True, 
-                max_length=256
+                max_length=128  # Reduced max length for speed
             )
             with torch.no_grad():
                 outputs = model_roberta(**inputs)
                 logits = outputs.logits
-                return torch.softmax(logits, dim=1).detach().numpy()
+                # Apply temperature scaling using the constant
+                scaled_logits = logits / TEMPERATURE
+                return torch.softmax(scaled_logits, dim=1).detach().numpy()
         
         lime_exp = explainer_lime.explain_instance(
-            text, 
+            truncated_text, 
             classifier_fn, 
-            num_features=10, 
-            num_samples=100
+            num_features=num_features,
+            num_samples=50  # Reduced number of samples
         )
         
         lime_data = []
         for feature, weight in lime_exp.as_list():
-            lime_data.append({
-                "feature": str(feature),  # Convert to string
-                "weight": float(weight),
-                "indicates": "CG" if weight > 0 else "OR"
-            })
+            # Only include features with significant impact
+            if abs(weight) > 0.05:
+                lime_data.append({
+                    "feature": str(feature),
+                    "weight": float(weight),
+                    "indicates": "CG" if weight > 0 else "OR"
+                })
         
         return {
             "lime": lime_data

@@ -6,10 +6,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultContent = document.getElementById('resultContent');
     const historyContainer = document.getElementById('history');
     const historyContent = document.getElementById('historyContent');
+    const toggleExplanationBtn = document.getElementById('toggleExplanation');
+    const explanationSection = document.getElementById('explanationSection');
     
     // Initial state - hide containers
     resultContainer.style.display = 'none';
     historyContainer.style.display = 'none';
+    explanationSection.style.display = 'none';
+    
+    // Store current analysis data
+    let currentAnalysis = null;
     
     // Analyze button event
     analyzeBtn.addEventListener('click', () => {
@@ -31,10 +37,34 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
     
+    // Toggle explanation button
+    toggleExplanationBtn.addEventListener('click', () => {
+        if (explanationSection.style.display === 'none') {
+            explanationSection.style.display = 'block';
+            toggleExplanationBtn.innerHTML = '<i>🔍</i> Hide Explanation';
+            
+            // Only load explanation if we have analysis data and haven't loaded it yet
+            if (currentAnalysis && !currentAnalysis.explanationLoaded) {
+                loadExplanation();
+            }
+        } else {
+            explanationSection.style.display = 'none';
+            toggleExplanationBtn.innerHTML = '<i>🔍</i> Show Explanation';
+        }
+    });
+    
+    // History button
     historyBtn.addEventListener('click', toggleHistory);
     
     function analyzeText(text) {
-    
+        // Reset explanation state
+        explanationSection.style.display = 'none';
+        toggleExplanationBtn.innerHTML = '<i>🔍</i> Show Explanation';
+        currentAnalysis = {
+            text: text,
+            explanationLoaded: false
+        };
+        
         resultContainer.style.display = 'block';
         historyContainer.style.display = 'none';
         resultContent.innerHTML = `
@@ -44,16 +74,20 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
         
+        // Request without explanation initially
         fetch("http://127.0.0.1:8000/predict", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: text, explain: true })
+            body: JSON.stringify({ text: text, explain: false })
         })
         .then(response => response.json())
         .then(data => {
             console.log("API returned:", data);
             displayResult(data);
             addToHistory(text, data);
+            
+            // Store analysis data
+            currentAnalysis.data = data;
         })
         .catch(err => {
             console.error("Popup error:", err);
@@ -65,6 +99,43 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         });
     }
+    
+    function loadExplanation() {
+        if (!currentAnalysis || !currentAnalysis.text) return;
+        
+        // Show loading in explanation section
+        explanationSection.innerHTML = `
+            <div style="text-align:center; padding:20px;">
+                <div class="loading"></div>
+                <p>Generating explanation...</p>
+                <p class="note">This may take a moment</p>
+            </div>
+        `;
+        
+        // Request explanation
+        fetch("http://127.0.0.1:8000/predict", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: currentAnalysis.text, explain: true })
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log("Explanation API returned:", data);
+            displayExplanation(data);
+            currentAnalysis.explanationLoaded = true;
+            currentAnalysis.explanationData = data;
+        })
+        .catch(err => {
+            console.error("Explanation error:", err);
+            explanationSection.innerHTML = `
+                <div class="fade-in" style="text-align:center; padding:20px; color:#c62828;">
+                    <p><strong>Error generating explanation</strong></p>
+                    <p>${err.message || 'Please try again'}</p>
+                </div>
+            `;
+        });
+    }
+    
     function displayResult(data) {
         const result = data.result;
         const roberta = result.roberta_result;
@@ -78,8 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const robertaPercentage = Math.round(roberta.confidence * 100);
         const aiPercentage = Math.round(aiDetector.confidence * 100);
         
-        // Build main content without explanations
-        let html = `
+        resultContent.innerHTML = `
             <div class="fade-in">
                 <p><strong>Final Assessment:</strong> <span class="label ${finalLabel === 'CG' || finalLabel === 'AI' ? 'ai-label' : 'human-label'}">${finalLabelDisplay}</span></p>
                 
@@ -106,57 +176,68 @@ document.addEventListener('DOMContentLoaded', () => {
                         'This text has a high probability of being AI-generated' : 
                         'This text appears to be human-written'}</p>
                 </div>
+            </div>
         `;
+    }
+    
+    function displayExplanation(data) {
+        const result = data.result;
         
-        // Add explanations if available
         if (result.explanations && result.explanations.roberta && result.explanations.roberta.lime) {
-            html += `
-                <div class="explanation-section">
-                    <h3><i>🔍</i> Explanation</h3>
-                    ${renderLimeExplanation(result.explanations.roberta.lime)}
-                </div>
-            `;
-        } else if (result.explanations && result.explanations.roberta && result.explanations.roberta.error) {
-            html += `
-                <div class="explanation-section">
-                    <h3><i>⚠️</i> Explanation Error</h3>
-                    <p>${result.explanations.roberta.error}</p>
+            explanationSection.innerHTML = renderLimeExplanation(result.explanations.roberta.lime);
+        } else {
+            explanationSection.innerHTML = `
+                <div class="fade-in" style="text-align:center; padding:20px;">
+                    <p>No explanation available</p>
                 </div>
             `;
         }
-        
-        html += `</div>`; // Close the fade-in div
-        
-        resultContent.innerHTML = html;
     }
-
-
+    
     function renderLimeExplanation(limeData) {
         if (!limeData || limeData.error || !Array.isArray(limeData)) {
             return '<p>No explanation available</p>';
         }
         
-        let html = '<div class="lime-features">';
-        html += '<h4>Top Features Influencing Prediction:</h4>';
-        html += '<table>';
-        html += '<tr><th>Feature</th><th>Weight</th><th>Indicates</th></tr>';
+        // Filter out features with insignificant impact
+        const significantFeatures = limeData.filter(item => Math.abs(item.weight) > 0.01);
         
-        limeData.forEach(item => {
-            const colorClass = item.weight > 0 ? 'ai-feature' : 'human-feature';
+        if (significantFeatures.length === 0) {
+            return `
+                <div class="fade-in" style="text-align:center; padding:20px;">
+                    <p>No significant features detected</p>
+                    <p class="threshold-note">Features with impact less than 0.01 are not shown</p>
+                </div>
+            `;
+        }
+        
+        // Sort by absolute weight (most significant first)
+        significantFeatures.sort((a, b) => Math.abs(b.weight) - Math.abs(a.weight));
+        
+        let html = '<div class="fade-in">';
+        html += '<h3>Key Features Influencing Prediction</h3>';
+        html += '<p class="threshold-note">Showing features with significant impact (|weight| > 0.01)</p>';
+        html += '<div class="feature-impact">';
+        
+        significantFeatures.forEach(item => {
+            const isAI = item.weight > 0;
+            const absWeight = Math.abs(item.weight);
+            const barWidth = Math.min(100, absWeight * 1000); // Scale for visualization
             
             html += `
-                <tr>
-                    <td>${item.feature}</td>
-                    <td class="${colorClass}">${item.weight > 0 ? '+' : ''}${item.weight.toFixed(4)}</td>
-                    <td>${item.indicates}</td>
-                </tr>
+                <div class="feature-item ${isAI ? 'ai-impact' : 'human-impact'}">
+                    <span>${item.feature}</span>
+                    <div class="impact-bar">
+                        <div class="impact-fill ${isAI ? 'ai-fill' : 'human-fill'}" style="width: ${barWidth}%"></div>
+                    </div>
+                    <span>${isAI ? 'AI' : 'Human'}</span>
+                </div>
             `;
         });
         
-        html += '</table></div>';
+        html += '</div></div>';
         return html;
     }
-    
 
     function getFriendlyLabel(label) {
         return label === "CG" || label === "AI" ? "AI-generated" : "Human-written";

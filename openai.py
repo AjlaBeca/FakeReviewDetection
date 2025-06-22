@@ -21,5 +21,7 @@ def predict_ai_generated(text):
         probs = torch.softmax(outputs.logits, dim=1)[0].cpu().numpy()
         predicted_class = probs.argmax()
         confidence = float(probs[predicted_class])
+        if confidence > 0.95: 
+            confidence = 0.85 + (confidence - 0.95) / 10
     label = "AI" if predicted_class == 1 else "Human"
     return {"label": label, "confidence": confidence, "class_probabilities": {"Human": float(probs[0]), "AI": float(probs[1])}}
