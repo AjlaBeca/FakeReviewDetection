@@ -256,3 +256,108 @@ h1 {
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
+/* Explanation section */
+.explanation-section {
+    margin-top: 25px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    border-left: 3px solid #6a11cb;
+}
+
+.tabs {
+    display: flex;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 15px;
+}
+
+.tab-btn {
+    padding: 8px 15px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    border-bottom: 2px solid transparent;
+}
+
+.tab-btn.active {
+    border-bottom: 2px solid #6a11cb;
+    font-weight: bold;
+    color: #6a11cb;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* SHAP styles */
+.shap-explanation {
+    line-height: 1.8;
+    font-size: 16px;
+    background: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+}
+
+.shap-token {
+    padding: 2px 4px;
+    margin: 0 1px;
+    border-radius: 3px;
+    display: inline-block;
+    white-space: pre-wrap;
+}
+
+.legend {
+    display: flex;
+    gap: 20px;
+    font-size: 14px;
+    margin-top: 10px;
+}
+
+.color-box {
+    display: inline-block;
+    width: 15px;
+    height: 15px;
+    margin-right: 5px;
+    border-radius: 3px;
+}
+
+.ai-color {
+    background-color: #ffcccc;
+}
+
+.human-color {
+    background-color: #ccccff;
+}
+
+/* LIME styles */
+.lime-explanation table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.lime-explanation th, 
+.lime-explanation td {
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+.lime-explanation th {
+    background-color: #f1f1f1;
+}
+
+.ai-feature {
+    color: #c62828;
+    font-weight: bold;
+}
+
+.human-feature {
+    color: #1565c0;
+    font-weight: bold;
+}
