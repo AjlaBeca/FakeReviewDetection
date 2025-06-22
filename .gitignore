@@ -1,1 +1,26 @@
-roberta_finetuned
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.python-version
+venv/
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Models (large files)
+models/
+
+# Node
+node_modules/
+package-lock.json
+
+# System
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
