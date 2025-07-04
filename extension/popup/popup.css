@@ -152,24 +152,31 @@ h1 {
 }
 
 .confidence-bar {
-  height: 10px;
-  border-radius: 5px;
-  background-color: #e0e0e0;
-  margin: 10px 0;
+  width: 100%;
+  background: #ddd;
+  border-radius: 6px;
+  height: 12px;
   overflow: hidden;
+  margin-top: 6px;
 }
 
 .confidence-fill {
   height: 100%;
-  border-radius: 5px;
+  border-radius: 6px 0 0 6px;
+  transition: width 0.4s ease;
 }
 
-.roberta .confidence-fill {
+/* Specific fills by type */
+.confidence-fill.roberta {
   background: linear-gradient(to right, #2196f3, #21cbf3);
 }
 
-.ai .confidence-fill {
+.confidence-fill.ai {
   background: linear-gradient(to right, #ff9800, #ffc107);
+}
+
+.confidence-fill.fake {
+  background-color: #4caf50;
 }
 
 .confidence-label {
@@ -465,4 +472,72 @@ h1 {
   color: #666;
   margin-top: 10px;
   text-align: center;
+}
+
+/* New buttons: Click to Analyze Element + Open in Tab */
+#clickAnalyzeBtn,
+#openTabBtn {
+  background: linear-gradient(to right, #00c6ff, #0072ff);
+  color: white;
+  box-shadow: 0 4px 15px rgba(0, 114, 255, 0.3);
+  padding: 12px;
+  margin-top: 10px;
+  width: 100%;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  border: none;
+  cursor: pointer;
+}
+
+#clickAnalyzeBtn:hover,
+#openTabBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 114, 255, 0.4);
+}
+
+/* Optional: click mode cursor effect */
+body.click-mode {
+  cursor: crosshair !important;
+}
+
+.confidence-fill.fake {
+  background-color: #4caf50; /* nice green for fake review */
+}
+
+.confidence-fill.roberta {
+  width: 100% !important;
+  background: linear-gradient(to right, #2196f3, #21cbf3);
+  height: 100%;
+}
+
+.info-icon {
+  cursor: pointer;
+  margin-left: 6px;
+  font-style: normal;
+  font-size: 14px;
+  background-color: #f0f0f0;
+  border-radius: 50%;
+  padding: 3px 6px;
+  user-select: none;
+  transition: background 0.2s ease;
+}
+
+.info-icon:hover {
+  background-color: #dcdcdc;
+}
+
+.info-box {
+  position: absolute;
+  z-index: 1000;
+  max-width: 240px;
+  padding: 10px 14px;
+  background-color: #333;
+  color: white;
+  font-size: 13px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  line-height: 1.4;
+  word-wrap: break-word;
 }

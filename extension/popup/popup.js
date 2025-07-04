@@ -139,64 +139,135 @@ document.addEventListener("DOMContentLoaded", () => {
             `;
       });
   }
-
   function displayResult(data) {
     const result = data.result;
     const roberta = result.roberta_result;
     const aiDetector = result.ai_detector_result;
+    const fakeReview = result.fake_review_result; // NEW
     const finalLabel = result.final_label;
 
     const finalLabelDisplay = getFriendlyLabel(finalLabel);
     const robertaLabelDisplay = getFriendlyLabel(roberta.label);
     const aiLabelDisplay = getFriendlyLabel(aiDetector.label);
+    const fakeLabelDisplay = fakeReview.label; // simple for now
 
     const robertaPercentage = Math.round(roberta.confidence * 100);
     const aiPercentage = Math.round(aiDetector.confidence * 100);
+    const fakePercentage = Math.round(fakeReview.confidence * 100); // NEW
 
     resultContent.innerHTML = `
-            <div class="fade-in">
-                <p><strong>Final Assessment:</strong> <span class="label ${
-                  finalLabel === "CG" || finalLabel === "AI"
-                    ? "ai-label"
-                    : "human-label"
-                }">${finalLabelDisplay}</span></p>
-                
-                <div style="margin: 20px 0; padding: 15px; background: #f1f8ff; border-radius: 10px;">
-                    <p><strong>RoBERTa Model Analysis</strong></p>
-                    <p>Result: <span class="label ${
-                      roberta.label === "CG" || roberta.label === "AI"
-                        ? "ai-label"
-                        : "human-label"
-                    }">${robertaLabelDisplay}</span></p>
-                    <p>Confidence: ${robertaPercentage}%</p>
-                    <div class="confidence-bar">
-                        <div class="confidence-fill roberta" style="width: ${robertaPercentage}%"></div>
-                    </div>
-                </div>
-                
-                <div style="margin: 20px 0; padding: 15px; background: #fff8f1; border-radius: 10px;">
-                    <p><strong>AI Detector Analysis</strong></p>
-                    <p>Result: <span class="label ${
-                      aiDetector.label === "CG" || aiDetector.label === "AI"
-                        ? "ai-label"
-                        : "human-label"
-                    }">${aiLabelDisplay}</span></p>
-                    <p>Confidence: ${aiPercentage}%</p>
-                    <div class="confidence-bar">
-                        <div class="confidence-fill ai" style="width: ${aiPercentage}%"></div>
-                    </div>
-                </div>
-                
-                <div style="margin-top: 20px; padding: 10px; background: #e8f5e9; border-radius: 8px; text-align: center;">
-                    <p><strong>Tip:</strong> ${
-                      finalLabel === "CG" || finalLabel === "AI"
-                        ? "This text has a high probability of being AI-generated"
-                        : "This text appears to be human-written"
-                    }</p>
-                </div>
-            </div>
-        `;
+  <div class="fade-in">
+    <p><strong>Final Assessment:</strong> <span class="label ${
+      finalLabel === "CG" || finalLabel === "AI" ? "ai-label" : "human-label"
+    }">${finalLabelDisplay}</span></p>
+
+    <div style="margin: 20px 0; padding: 15px; background: #f1f8ff; border-radius: 10px;">
+      <p><strong>RoBERTa Model Analysis</strong> 
+        <span class="info-icon" data-id="roberta" title="This model detects AI-generated text by analyzing linguistic patterns and writing style.">ℹ️</span>
+      </p>
+      <p>Result: <span class="label ${
+        roberta.label === "CG" || roberta.label === "AI"
+          ? "ai-label"
+          : "human-label"
+      }">${robertaLabelDisplay}</span></p>
+      <p>Confidence: ${robertaPercentage}%</p>
+      <div class="confidence-bar">
+        <div class="confidence-fill roberta" style="width: ${robertaPercentage}%"></div>
+      </div>
+    </div>
+
+    <div style="margin: 20px 0; padding: 15px; background: #fff8f1; border-radius: 10px;">
+      <p><strong>AI Detector Analysis</strong> 
+        <span class="info-icon" data-id="aidetector" title="This model estimates the likelihood that the text was written by an AI using a specialized classifier.">ℹ️</span>
+      </p>
+      <p>Result: <span class="label ${
+        aiDetector.label === "CG" || aiDetector.label === "AI"
+          ? "ai-label"
+          : "human-label"
+      }">${aiLabelDisplay}</span></p>
+      <p>Confidence: ${aiPercentage}%</p>
+      <div class="confidence-bar">
+        <div class="confidence-fill ai" style="width: ${aiPercentage}%"></div>
+      </div>
+    </div>
+
+    <div style="margin: 20px 0; padding: 15px; background: #e8f5e9; border-radius: 10px;">
+      <p><strong>Fake Review Detector Analysis</strong> 
+        <span class="info-icon" data-id="fake" title="This model predicts whether the review is genuine or fake based on review content and patterns.">ℹ️</span>
+      </p>
+      <p>Result: <span class="label ${
+        fakeReview.label === "Fake" ? "ai-label" : "human-label"
+      }">${fakeLabelDisplay}</span></p>
+      <p>Confidence: ${fakePercentage}%</p>
+      <div class="confidence-bar">
+        <div class="confidence-fill fake" style="width: ${fakePercentage}%; background-color: #4caf50;"></div>
+      </div>
+    </div>
+
+    <div style="margin-top: 20px; padding: 10px; background: #e0e0e0; border-radius: 8px; text-align: center;">
+      <p><strong>Tip:</strong> ${
+        ["CG", "AI", "Fake"].includes(finalLabel)
+          ? "This text has a high probability of being AI-generated or fake"
+          : "This text appears to be human-written and genuine"
+      }</p>
+    </div>
+  </div>
+`;
   }
+
+  document.addEventListener("click", (event) => {
+    const icon = event.target.closest(".info-icon");
+    const existingTooltip = document.querySelector(".info-box");
+
+    if (icon) {
+      event.preventDefault();
+
+      // If this icon already has its tooltip visible, remove it (toggle)
+      if (
+        existingTooltip &&
+        existingTooltip.dataset.owner === icon.dataset.id
+      ) {
+        existingTooltip.remove();
+        return;
+      }
+
+      // Remove any other tooltip
+      document.querySelectorAll(".info-box").forEach((box) => box.remove());
+
+      // Tooltip text mapping
+      const tooltipTexts = {
+        roberta:
+          "This model detects AI-generated text by analyzing linguistic patterns and writing style.",
+        aidetector:
+          "This model estimates the likelihood that the text was written by an AI using a specialized classifier.",
+        fake: "This model predicts whether the review is genuine or fake based on review content and patterns.",
+      };
+
+      const id = icon.dataset.id;
+      const tooltipText = tooltipTexts[id];
+      if (!tooltipText) return;
+
+      // Create tooltip
+      const tooltip = document.createElement("div");
+      tooltip.className = "info-box";
+      tooltip.textContent = tooltipText;
+      tooltip.dataset.owner = id; // Mark the tooltip as belonging to this icon
+      document.body.appendChild(tooltip);
+
+      // Position it
+      const rect = icon.getBoundingClientRect();
+      const top = rect.bottom + window.scrollY + 8;
+      const left = Math.min(
+        window.innerWidth - 250,
+        rect.left + window.scrollX
+      );
+      tooltip.style.top = `${top}px`;
+      tooltip.style.left = `${left}px`;
+    } else {
+      // Clicked outside: remove any tooltip
+      document.querySelectorAll(".info-box").forEach((box) => box.remove());
+    }
+  });
 
   function displayExplanation(data) {
     const result = data.result;
@@ -225,14 +296,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Filter out features with insignificant impact
     const significantFeatures = limeData.filter(
-      (item) => Math.abs(item.weight) > 0.01
+      (item) => Math.abs(item.weight) > 0.001
     );
 
     if (significantFeatures.length === 0) {
       return `
                 <div class="fade-in" style="text-align:center; padding:20px;">
                     <p>No significant features detected</p>
-                    <p class="threshold-note">Features with impact less than 0.01 are not shown</p>
+                    <p class="threshold-note">Features with impact less than 0.001 are not shown</p>
                 </div>
             `;
     }
@@ -243,7 +314,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let html = '<div class="fade-in">';
     html += "<h3>Key Features Influencing Prediction</h3>";
     html +=
-      '<p class="threshold-note">Showing features with significant impact (|weight| > 0.01)</p>';
+      '<p class="threshold-note">Showing features with significant impact (|weight| > 0.001)</p>';
     html += '<div class="feature-impact">';
 
     significantFeatures.forEach((item) => {
@@ -275,7 +346,11 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   function getFriendlyLabel(label) {
-    return label === "CG" || label === "AI" ? "AI-generated" : "Human-written";
+    if (label === "CG" || label === "AI") return "AI-generated";
+    if (label === "OR" || label === "Human") return "Human-written";
+    if (label === "Fake") return "Fake Review";
+    if (label === "Genuine") return "Genuine Review";
+    return label;
   }
 
   function normalizeLabel(label) {
@@ -383,86 +458,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-function displayExplanations(explanations) {
-  if (!explanations || explanations.error) {
-    return `<div class="explanation-section">
-            <h3><i>⚠️</i> Explanation Error</h3>
-            <p>${explanations?.error || "No explanations available"}</p>
-        </div>`;
-  }
-
-  // Handle SHAP errors
-  if (explanations.roberta?.shap?.error) {
-    return `<div class="explanation-section">
-            <h3><i>🔍</i> Explanation (LIME)</h3>
-            ${renderLimeExplanation(explanations.roberta.lime)}
-            <div class="error">
-                SHAP Error: ${explanations.roberta.shap.error}
-            </div>
-        </div>`;
-  }
-
-  if (!explanations || !explanations.roberta) {
-    return '<div class="explanation-section">No explanations available</div>';
-  }
-
-  const roberta = explanations.roberta;
-
-  // SHAP visualization
-  let shapHTML = '<div class="shap-explanation">';
-  roberta.shap.tokens.forEach((token, i) => {
-    const value = roberta.shap.values[i];
-    const intensity = Math.min(1, Math.abs(value) * 5);
-    const color =
-      value > 0
-        ? `rgb(255, ${Math.round(200 * (1 - intensity))}, ${Math.round(
-            200 * (1 - intensity)
-          )})`
-        : `rgb(${Math.round(200 * (1 - intensity))}, ${Math.round(
-            200 * (1 - intensity)
-          )}, 255)`;
-
-    shapHTML += `<span class="shap-token" style="background-color:${color}">${token}</span>`;
-  });
-  shapHTML += "</div>";
-
-  // LIME visualization
-  let limeHTML = '<div class="lime-explanation"><table>';
-  roberta.lime.forEach((item) => {
-    const colorClass = item.weight > 0 ? "ai-feature" : "human-feature";
-    limeHTML += `
-            <tr>
-                <td>${item.feature}</td>
-                <td class="${colorClass}">${
-      item.weight > 0 ? "+" : ""
-    }${item.weight.toFixed(4)}</td>
-                <td>${item.indicates}</td>
-            </tr>
-        `;
-  });
-  limeHTML += "</table></div>";
-
-  return `
-        <div class="explanation-section">
-            <h3><i>🔍</i> Explanation</h3>
-            <div class="tabs">
-                <button class="tab-btn active" data-tab="shap">SHAP</button>
-                <button class="tab-btn" data-tab="lime">LIME</button>
-            </div>
-            <div id="shapExplanation" class="tab-content active">
-                ${shapHTML}
-                <div class="legend">
-                    <div><span class="color-box ai-color"></span> Indicates CG/AI</div>
-                    <div><span class="color-box human-color"></span> Indicates OR/Human</div>
-                </div>
-            </div>
-            <div id="limeExplanation" class="tab-content">
-                ${limeHTML}
-            </div>
-        </div>
-    `;
-}
-
 function renderShapExplanation(shapData) {
   if (!shapData || !shapData.tokens || !shapData.values) {
     return "<p>No SHAP explanation available</p>";
@@ -492,33 +487,5 @@ function renderShapExplanation(shapData) {
         <div><span class="color-box human-color"></span> Indicates OR/Human</div>
     </div>`;
 
-  return html;
-}
-
-function renderLimeExplanation(limeData) {
-  if (!limeData || limeData.error || !Array.isArray(limeData)) {
-    return "<p>No LIME explanation available</p>";
-  }
-
-  let html = '<div class="lime-features">';
-  html += "<h4>Top Features Influencing Prediction:</h4>";
-  html += "<table>";
-  html += "<tr><th>Feature</th><th>Weight</th><th>Indicates</th></tr>";
-
-  limeData.forEach((item) => {
-    const colorClass = item.weight > 0 ? "ai-feature" : "human-feature";
-
-    html += `
-            <tr>
-                <td>${item.feature}</td>
-                <td class="${colorClass}">${
-      item.weight > 0 ? "+" : ""
-    }${item.weight.toFixed(4)}</td>
-                <td>${item.indicates}</td>
-            </tr>
-        `;
-  });
-
-  html += "</table></div>";
   return html;
 }
