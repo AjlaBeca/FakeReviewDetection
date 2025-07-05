@@ -9,14 +9,17 @@ model_ai = None
 
 def load_models():
     global tokenizer_ai, model_ai
-    if tokenizer_ai is None:
-        tokenizer_ai = AutoTokenizer.from_pretrained("roberta-base-openai-detector")
-    if model_ai is None:
-        model_ai = AutoModelForSequenceClassification.from_pretrained(
-            "roberta-base-openai-detector"
-        )
-        model_ai.to(device)
-        model_ai.eval()
+    try:
+        if tokenizer_ai is None:
+            tokenizer_ai = AutoTokenizer.from_pretrained("roberta-base-openai-detector")
+        if model_ai is None:
+            model_ai = AutoModelForSequenceClassification.from_pretrained(
+                "roberta-base-openai-detector"
+            )
+            model_ai.to(device)
+            model_ai.eval()
+    except Exception as e:
+        raise RuntimeError(f"Failed to load OpenAI model: {e}")
 
 
 def predict_ai_generated(text):

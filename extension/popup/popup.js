@@ -271,71 +271,71 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function displayExplanation(data) {
     const result = data.result;
+    const explanations = result.explanations?.roberta;
 
-    if (
-      result.explanations &&
-      result.explanations.roberta &&
-      result.explanations.roberta.lime
+    if (Array.isArray(explanations)) {
+      explanationSection.innerHTML =
+        renderShapExplanationFromArray(explanations);
+    } else if (
+      explanations?.shap?.detailed_analysis?.evidence_summary?.key_indicators
     ) {
-      explanationSection.innerHTML = renderLimeExplanation(
-        result.explanations.roberta.lime
+      explanationSection.innerHTML = renderShapExplanationFromArray(
+        explanations.shap.detailed_analysis.evidence_summary.key_indicators
       );
     } else {
       explanationSection.innerHTML = `
-                <div class="fade-in" style="text-align:center; padding:20px;">
-                    <p>No explanation available</p>
-                </div>
-            `;
+            <div class="fade-in" style="text-align:center; padding:20px;">
+                <p>${explanations?.error || "No explanation available"}</p>
+            </div>`;
     }
   }
-
-  function renderLimeExplanation(limeData) {
-    if (!limeData || limeData.error || !Array.isArray(limeData)) {
-      return "<p>No explanation available</p>";
+  function renderShapExplanationFromArray(shapArray) {
+    if (!Array.isArray(shapArray)) {
+      return "<p>No SHAP explanation available</p>";
     }
 
-    // Filter out features with insignificant impact
-    const significantFeatures = limeData.filter(
-      (item) => Math.abs(item.weight) > 0.001
-    );
+    const significantFeatures = shapArray
+      .filter((item) => item && item.feature && typeof item.weight === "number")
+      .map((item) => ({
+        ...item,
+        feature: item.feature
+          .replace(/Ġ/g, " ")
+          .replace(/âĢ/g, "'")
+          .replace(/Ļ/g, "")
+          .replace(/[^\w\s.,!?'"čćžšđČĆŽŠĐ-]/g, "") // ⚠️ now preserves Bosnian letters
+          .trim(),
+      }))
+      .filter((item) => item.feature.length > 1);
 
     if (significantFeatures.length === 0) {
       return `
-                <div class="fade-in" style="text-align:center; padding:20px;">
-                    <p>No significant features detected</p>
-                    <p class="threshold-note">Features with impact less than 0.001 are not shown</p>
-                </div>
-            `;
+      <div class="fade-in" style="text-align:center; padding:20px;">
+        <p>No significant features detected</p>
+        <p class="threshold-note">Only phrases with meaningful impact are shown</p>
+      </div>`;
     }
 
-    // Sort by absolute weight (most significant first)
     significantFeatures.sort((a, b) => Math.abs(b.weight) - Math.abs(a.weight));
 
     let html = '<div class="fade-in">';
-    html += "<h3>Key Features Influencing Prediction</h3>";
-    html +=
-      '<p class="threshold-note">Showing features with significant impact (|weight| > 0.001)</p>';
+    html += "<h3>Key Phrases Influencing Prediction</h3>";
     html += '<div class="feature-impact">';
 
-    significantFeatures.forEach((item) => {
+    for (const item of significantFeatures) {
       const isAI = item.weight > 0;
-      const absWeight = Math.abs(item.weight);
-      const barWidth = Math.min(100, absWeight * 1000); // Scale for visualization
+      const barWidth = Math.min(100, Math.abs(item.weight) * 1000);
 
       html += `
-                <div class="feature-item ${
-                  isAI ? "ai-impact" : "human-impact"
-                }">
-                    <span>${item.feature}</span>
-                    <div class="impact-bar">
-                        <div class="impact-fill ${
-                          isAI ? "ai-fill" : "human-fill"
-                        }" style="width: ${barWidth}%"></div>
-                    </div>
-                    <span>${isAI ? "AI" : "Human"}</span>
-                </div>
-            `;
-    });
+      <div class="feature-item ${isAI ? "ai-impact" : "human-impact"}">
+        <span>"${item.feature}"</span>
+        <div class="impact-bar">
+          <div class="impact-fill ${isAI ? "ai-fill" : "human-fill"}"
+            style="width: ${barWidth}%">
+          </div>
+        </div>
+        <span>${isAI ? "AI" : "Human"}</span>
+      </div>`;
+    }
 
     html += "</div></div>";
     return html;
@@ -457,35 +457,3 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 });
-
-function renderShapExplanation(shapData) {
-  if (!shapData || !shapData.tokens || !shapData.values) {
-    return "<p>No SHAP explanation available</p>";
-  }
-
-  let html = '<div class="shap-text">';
-
-  shapData.tokens.forEach((token, i) => {
-    const value = shapData.values[i];
-    // Normalize SHAP value for color intensity (0-1)
-    const intensity = Math.min(1, Math.abs(value) * 5);
-    const color =
-      value > 0
-        ? `rgb(255, ${Math.round(200 * (1 - intensity))}, ${Math.round(
-            200 * (1 - intensity)
-          )})`
-        : `rgb(${Math.round(200 * (1 - intensity))}, ${Math.round(
-            200 * (1 - intensity)
-          )}, 255)`;
-
-    html += `<span class="shap-token" style="background-color:${color}">${token}</span>`;
-  });
-
-  html += "</div>";
-  html += `<div class="shap-legend">
-        <div><span class="color-box ai-color"></span> Indicates CG/AI</div>
-        <div><span class="color-box human-color"></span> Indicates OR/Human</div>
-    </div>`;
-
-  return html;
-}
