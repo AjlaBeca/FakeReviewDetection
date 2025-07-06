@@ -13,6 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
   resultContainer.style.display = "none";
   historyContainer.style.display = "none";
   explanationSection.style.display = "none";
+  toggleExplanationBtn.style.display = "none";
 
   // Store current analysis data
   let currentAnalysis = null;
@@ -88,6 +89,7 @@ document.addEventListener("DOMContentLoaded", () => {
       .then((data) => {
         console.log("API returned:", data);
         displayResult(data);
+        toggleExplanationBtn.style.display = "inline-block";
         addToHistory(text, data);
 
         // Store analysis data
@@ -101,6 +103,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     <p>Please ensure the detection service is running</p>
                 </div>
             `;
+        toggleExplanationBtn.style.display = "none";
       });
   }
 
