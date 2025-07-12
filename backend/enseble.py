@@ -2,7 +2,7 @@ from openai import predict_ai_generated
 from bert import predict_fake_review
 import logging
 from prediction import predict_roberta, explain_roberta
-from XAIAnalyzer import explain_with_xai
+from prediction import explain_text_with_xai
 
 logger = logging.getLogger(__name__)
 
@@ -31,25 +31,38 @@ def ensemble_predict(text, include_explanations=False):
 
     if include_explanations:
         try:
-            shap_explanation = explain_roberta(
-                text
-            )  # should return a list of {feature, weight, indicates}
-            if isinstance(shap_explanation, list):
-                model_prediction = roberta_result
-                explanation = explain_with_xai(text, model_prediction, shap_explanation)
+            # Get feature attributions from explain_roberta
+            feature_attributions = explain_roberta(text)
 
-                key_indicators = (
-                    explanation.get("detailed_analysis", {})
-                    .get("evidence_summary", {})
-                    .get("key_indicators", [])
+            # Debug logging
+            logger.info(f"Feature attributions type: {type(feature_attributions)}")
+            logger.info(f"Feature attributions: {feature_attributions}")
+
+            if isinstance(feature_attributions, list) and len(feature_attributions) > 0:
+                # Use the comprehensive explanation function
+                explanation = explain_text_with_xai(text)
+
+                # Debug logging
+                logger.info(f"Explanation type: {type(explanation)}")
+                logger.info(
+                    f"Explanation keys: {explanation.keys() if isinstance(explanation, dict) else 'Not a dict'}"
                 )
-                result["explanations"] = {"roberta": key_indicators}
+
+                # Store the full explanation under roberta key
+                result["explanations"] = {"roberta": explanation}
 
             else:
-                logger.warning("SHAP explanation was not a list")
-                result["explanations"] = {"error": "Explanation unavailable"}
+                logger.warning(
+                    f"SHAP explanation was not a valid list: {feature_attributions}"
+                )
+                result["explanations"] = {
+                    "roberta": {"error": "No meaningful features found"}
+                }
+
         except Exception as e:
-            logger.error(f"Error generating explanation: {e}")
-            result["explanations"] = {"error": "Failed to generate explanation"}
+            logger.error(f"Error generating explanation: {e}", exc_info=True)
+            result["explanations"] = {
+                "roberta": {"error": f"Failed to generate explanation: {str(e)}"}
+            }
 
     return result

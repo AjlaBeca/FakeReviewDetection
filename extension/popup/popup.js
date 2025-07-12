@@ -146,33 +146,42 @@ document.addEventListener("DOMContentLoaded", () => {
     const result = data.result;
     const roberta = result.roberta_result;
     const aiDetector = result.ai_detector_result;
-    const fakeReview = result.fake_review_result; // NEW
+    const fakeReview = result.fake_review_result;
     const finalLabel = result.final_label;
 
     const finalLabelDisplay = getFriendlyLabel(finalLabel);
     const robertaLabelDisplay = getFriendlyLabel(roberta.label);
     const aiLabelDisplay = getFriendlyLabel(aiDetector.label);
-    const fakeLabelDisplay = fakeReview.label; // simple for now
+    const fakeLabelDisplay = fakeReview.label;
 
     const robertaPercentage = Math.round(roberta.confidence * 100);
     const aiPercentage = Math.round(aiDetector.confidence * 100);
-    const fakePercentage = Math.round(fakeReview.confidence * 100); // NEW
+    const fakePercentage = Math.round(fakeReview.confidence * 100);
+
+    let tipMessage = "";
+    if (finalLabel === "CG" || finalLabel === "AI") {
+      tipMessage = "This text has a high probability of being AI-generated";
+    } else if (finalLabel === "Fake") {
+      tipMessage = "This review appears to be fake or inauthentic";
+    } else {
+      tipMessage = "This text appears to be human-written and genuine";
+    }
 
     resultContent.innerHTML = `
   <div class="fade-in">
-    <p><strong>Final Assessment:</strong> <span class="label ${
-      finalLabel === "CG" || finalLabel === "AI" ? "ai-label" : "human-label"
-    }">${finalLabelDisplay}</span></p>
+    <p><strong>Final Assessment:</strong> <span class="label ${getLabelClass(
+      finalLabel
+    )}">
+        ${getLabelText(finalLabel)}
+      </span> </p>
 
-    <div style="margin: 20px 0; padding: 15px; background: #f1f8ff; border-radius: 10px;">
+   <div style="margin: 20px 0; padding: 15px; background: #f1f8ff; border-radius: 10px;">
       <p><strong>RoBERTa Model Analysis</strong> 
         <span class="info-icon" data-id="roberta" title="This model detects AI-generated text by analyzing linguistic patterns and writing style.">ℹ️</span>
       </p>
-      <p>Result: <span class="label ${
-        roberta.label === "CG" || roberta.label === "AI"
-          ? "ai-label"
-          : "human-label"
-      }">${robertaLabelDisplay}</span></p>
+      <p>Result: <span class="label ${getLabelClass(
+        roberta.label
+      )}">${getLabelText(roberta.label)}</span></p>
       <p>Confidence: ${robertaPercentage}%</p>
       <div class="confidence-bar">
         <div class="confidence-fill roberta" style="width: ${robertaPercentage}%"></div>
@@ -183,36 +192,30 @@ document.addEventListener("DOMContentLoaded", () => {
       <p><strong>AI Detector Analysis</strong> 
         <span class="info-icon" data-id="aidetector" title="This model estimates the likelihood that the text was written by an AI using a specialized classifier.">ℹ️</span>
       </p>
-      <p>Result: <span class="label ${
-        aiDetector.label === "CG" || aiDetector.label === "AI"
-          ? "ai-label"
-          : "human-label"
-      }">${aiLabelDisplay}</span></p>
+      <p>Result: <span class="label ${getLabelClass(
+        aiDetector.label
+      )}">${getLabelText(aiDetector.label)}</span></p>
       <p>Confidence: ${aiPercentage}%</p>
       <div class="confidence-bar">
         <div class="confidence-fill ai" style="width: ${aiPercentage}%"></div>
       </div>
     </div>
 
-    <div style="margin: 20px 0; padding: 15px; background: #e8f5e9; border-radius: 10px;">
+   <div style="margin: 20px 0; padding: 15px; background: #e8f5e9; border-radius: 10px;">
       <p><strong>Fake Review Detector Analysis</strong> 
         <span class="info-icon" data-id="fake" title="This model predicts whether the review is genuine or fake based on review content and patterns.">ℹ️</span>
       </p>
-      <p>Result: <span class="label ${
-        fakeReview.label === "Fake" ? "ai-label" : "human-label"
-      }">${fakeLabelDisplay}</span></p>
+      <p>Result: <span class="label ${getLabelClass(
+        fakeReview.label
+      )}">${getLabelText(fakeReview.label)}</span></p>
       <p>Confidence: ${fakePercentage}%</p>
       <div class="confidence-bar">
-        <div class="confidence-fill fake" style="width: ${fakePercentage}%; background-color: #4caf50;"></div>
+        <div class="confidence-fill fake" style="width: ${fakePercentage}%"></div>
       </div>
     </div>
 
-    <div style="margin-top: 20px; padding: 10px; background: #e0e0e0; border-radius: 8px; text-align: center;">
-      <p><strong>Tip:</strong> ${
-        ["CG", "AI", "Fake"].includes(finalLabel)
-          ? "This text has a high probability of being AI-generated or fake"
-          : "This text appears to be human-written and genuine"
-      }</p>
+   <div style="margin-top: 20px; padding: 10px; background: #e0e0e0; border-radius: 8px; text-align: center;">
+      <p><strong>Tip:</strong> ${getTipMessage(finalLabel)}</p>
     </div>
   </div>
 `;
@@ -272,19 +275,15 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  /* explanation code */
   function displayExplanation(data) {
     const result = data.result;
     const explanations = result.explanations?.roberta;
 
-    if (Array.isArray(explanations)) {
+    if (explanations?.conclusion) {
+      // Render comprehensive explanation
       explanationSection.innerHTML =
-        renderShapExplanationFromArray(explanations);
-    } else if (
-      explanations?.shap?.detailed_analysis?.evidence_summary?.key_indicators
-    ) {
-      explanationSection.innerHTML = renderShapExplanationFromArray(
-        explanations.shap.detailed_analysis.evidence_summary.key_indicators
-      );
+        renderComprehensiveExplanation(explanations);
     } else {
       explanationSection.innerHTML = `
             <div class="fade-in" style="text-align:center; padding:20px;">
@@ -292,6 +291,60 @@ document.addEventListener("DOMContentLoaded", () => {
             </div>`;
     }
   }
+
+  function renderComprehensiveExplanation(explanation) {
+    return `
+    <div class="fade-in explanation-container">
+        <div class="explanation-section">
+            <h3>Analysis Conclusion</h3>
+            <p class="conclusion">${explanation.conclusion}</p>
+        </div>
+        
+        <div class="explanation-section">
+            <h3>Key Linguistic Indicators</h3>
+            <div class="feature-impact">
+                ${explanation.detailed_analysis.evidence_summary.key_indicators
+                  .map((indicator) => renderIndicator(indicator))
+                  .join("")}
+            </div>
+        </div>
+        
+        ${
+          explanation.alternative_explanations.length > 0
+            ? `
+        <div class="explanation-section">
+            <h3>Alternative Interpretations</h3>
+            <ul class="alternative-list">
+                ${explanation.alternative_explanations
+                  .map(
+                    (alt) =>
+                      `<li><strong>${alt.explanation}:</strong> ${alt.reasoning}</li>`
+                  )
+                  .join("")}
+            </ul>
+        </div>`
+            : ""
+        }
+    </div>`;
+  }
+
+  function renderIndicator(indicator) {
+    const isAI = indicator.indicates === "AI" || indicator.indicates === "CG";
+    const barWidth = Math.min(100, Math.abs(indicator.weight) * 1000);
+    const direction = isAI ? "toward AI" : "toward human";
+
+    return `
+    <div class="feature-item ${isAI ? "ai-impact" : "human-impact"}">
+        <div class="feature-phrase">"${indicator.feature}"</div>
+        <div class="feature-direction">${direction}</div>
+        <div class="impact-bar">
+            <div class="impact-fill ${isAI ? "ai-fill" : "human-fill"}"
+                style="width: ${barWidth}%">
+            </div>
+        </div>
+    </div>`;
+  }
+
   function renderShapExplanationFromArray(shapArray) {
     if (!Array.isArray(shapArray)) {
       return "<p>No SHAP explanation available</p>";
@@ -347,7 +400,176 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("pinBtn").addEventListener("click", () => {
     chrome.tabs.create({ url: chrome.runtime.getURL("popup/analyzer.html") });
   });
+  // Fixed displayExplanation function
+  function displayExplanation(data) {
+    console.log("displayExplanation called with:", data);
 
+    const result = data.result;
+    console.log("Result object:", result);
+
+    const explanations = result.explanations?.roberta;
+    console.log("Explanations object:", explanations);
+
+    if (explanations && !explanations.error) {
+      // Check if we have the comprehensive explanation structure
+      if (explanations.conclusion || explanations.detailed_analysis) {
+        explanationSection.innerHTML =
+          renderComprehensiveExplanation(explanations);
+      } else {
+        // Handle simpler explanation format
+        explanationSection.innerHTML = renderSimpleExplanation(explanations);
+      }
+    } else {
+      explanationSection.innerHTML = `
+      <div class="fade-in" style="text-align:center; padding:20px; color:#c62828;">
+        <p><strong>No explanation available</strong></p>
+        <p>${explanations?.error || "Unable to generate explanation"}</p>
+      </div>`;
+    }
+  }
+
+  // Fixed renderComprehensiveExplanation function
+  function renderComprehensiveExplanation(explanation) {
+    console.log("renderComprehensiveExplanation called with:", explanation);
+
+    let html = '<div class="fade-in explanation-container">';
+
+    // Analysis Conclusion
+    if (explanation.conclusion) {
+      html += `
+      <div class="explanation-section">
+        <h3>Analysis Conclusion</h3>
+        <p class="conclusion">${explanation.conclusion}</p>
+      </div>`;
+    }
+
+    // Key Linguistic Indicators
+    const keyIndicators =
+      explanation.detailed_analysis?.evidence_summary?.key_indicators ||
+      explanation.key_indicators ||
+      [];
+
+    if (keyIndicators.length > 0) {
+      html += `
+      <div class="explanation-section">
+        <h3>Key Linguistic Indicators</h3>
+        <div class="feature-impact">
+          ${keyIndicators
+            .map((indicator) => renderIndicator(indicator))
+            .join("")}
+        </div>
+      </div>`;
+    }
+
+    // Alternative Explanations
+    const alternatives = explanation.alternative_explanations || [];
+    if (alternatives.length > 0) {
+      html += `
+      <div class="explanation-section">
+        <h3>Alternative Interpretations</h3>
+        <ul class="alternative-list">
+          ${alternatives
+            .map(
+              (alt) => `
+            <li>
+              <strong>${alt.explanation}:</strong> ${alt.reasoning}
+              <span class="likelihood">(${alt.likelihood} likelihood)</span>
+            </li>
+          `
+            )
+            .join("")}
+        </ul>
+      </div>`;
+    }
+
+    // Reasoning Chain
+    const reasoningChain =
+      explanation.reasoning_steps || explanation.reasoning_chain || [];
+    if (reasoningChain.length > 0) {
+      html += `
+      <div class="explanation-section">
+        <h3>Analysis Steps</h3>
+        <div class="reasoning-chain">
+          ${reasoningChain
+            .map(
+              (step, index) => `
+            <div class="reasoning-step">
+              <div class="step-number">${step.step || index + 1}</div>
+              <div class="step-content">
+                <strong>${step.description}</strong>
+                <p>${step.finding}</p>
+                <small class="step-significance">${step.significance}</small>
+              </div>
+            </div>
+          `
+            )
+            .join("")}
+        </div>
+      </div>`;
+    }
+
+    html += "</div>";
+    return html;
+  }
+
+  // New function to handle simpler explanation formats
+  function renderSimpleExplanation(explanation) {
+    console.log("renderSimpleExplanation called with:", explanation);
+
+    let html = '<div class="fade-in explanation-container">';
+
+    // If explanation is an array (feature attributions)
+    if (Array.isArray(explanation)) {
+      html += `
+      <div class="explanation-section">
+        <h3>Key Features</h3>
+        <div class="feature-impact">
+          ${explanation.map((feature) => renderIndicator(feature)).join("")}
+        </div>
+      </div>`;
+    } else if (typeof explanation === "object") {
+      // If explanation is an object, try to render its properties
+      html += `
+      <div class="explanation-section">
+        <h3>Analysis Details</h3>
+        <pre style="background: #f5f5f5; padding: 10px; border-radius: 5px; overflow-x: auto;">
+          ${JSON.stringify(explanation, null, 2)}
+        </pre>
+      </div>`;
+    } else {
+      html += `
+      <div class="explanation-section">
+        <p>${explanation}</p>
+      </div>`;
+    }
+
+    html += "</div>";
+    return html;
+  }
+
+  // Fixed renderIndicator function
+  function renderIndicator(indicator) {
+    if (!indicator || !indicator.feature) {
+      return '<div class="feature-item">Invalid indicator</div>';
+    }
+
+    const isAI = indicator.indicates === "AI" || indicator.indicates === "CG";
+    const weight = parseFloat(indicator.weight) || 0;
+    const barWidth = Math.min(100, Math.abs(weight) * 50); // Adjusted multiplier
+    const direction = isAI ? "toward AI" : "toward Human";
+
+    return `
+    <div class="feature-item ${isAI ? "ai-impact" : "human-impact"}">
+      <div class="feature-phrase">"${indicator.feature}"</div>
+      <div class="feature-direction">${direction}</div>
+      <div class="impact-bar">
+        <div class="impact-fill ${isAI ? "ai-fill" : "human-fill"}"
+             style="width: ${barWidth}%">
+        </div>
+      </div>
+      <div class="feature-weight">Weight: ${weight.toFixed(3)}</div>
+    </div>`;
+  }
   function getFriendlyLabel(label) {
     if (label === "CG" || label === "AI") return "AI-generated";
     if (label === "OR" || label === "Human") return "Human-written";
@@ -359,7 +581,41 @@ document.addEventListener("DOMContentLoaded", () => {
   function normalizeLabel(label) {
     if (label === "CG" || label === "AI") return "AI";
     if (label === "OR" || label === "Human") return "Human";
+    if (label === "Fake") return "AI";
     return label;
+  }
+
+  function getLabelClass(label) {
+    if (
+      label === "CG" ||
+      label === "AI" ||
+      label === "AI-generated or Fake" ||
+      label === "Fake"
+    ) {
+      return "ai-label";
+    }
+    return "human-label";
+  }
+
+  function getLabelText(label) {
+    if (label === "CG" || label === "AI") return "AI-generated";
+    if (label === "OR" || label === "Human") return "Human-written";
+    if (label === "Fake") return "Fake Review";
+    if (label === "Genuine") return "Genuine Review";
+    if (label === "AI-generated or Fake") return "AI-generated or Fake";
+    return label;
+  }
+
+  function getTipMessage(finalLabel) {
+    if (
+      finalLabel === "CG" ||
+      finalLabel === "AI" ||
+      finalLabel === "Fake" ||
+      finalLabel === "AI-generated or Fake"
+    ) {
+      return "This text has a high probability of being AI-generated or fake";
+    }
+    return "This text appears to be human-written and genuine";
   }
 
   // Function to add to history
@@ -367,25 +623,24 @@ document.addEventListener("DOMContentLoaded", () => {
     const historyItem = document.createElement("div");
     historyItem.className = "history-item fade-in";
 
-    const finalLabel =
-      data.result.final_label === "CG" || data.result.final_label === "AI"
-        ? '<span class="label ai-label"><span class="status-dot ai-dot"></span> AI-generated</span>'
-        : '<span class="label human-label"><span class="status-dot human-dot"></span> Human-written</span>';
+    const finalLabel = data.result.final_label;
 
     historyItem.innerHTML = `
-            <div class="history-text">"${
-              text.length > 100 ? text.substring(0, 100) + "..." : text
-            }"</div>
-            <div class="history-result">
-                <p>Assessment: ${finalLabel}</p>
-                <p>Models agree: ${
-                  normalizeLabel(data.result.roberta_result.label) ===
-                  normalizeLabel(data.result.ai_detector_result.label)
-                    ? "Yes"
-                    : "No"
-                }</p>
-            </div>
-        `;
+      <div class="history-text">"${
+        text.length > 100 ? text.substring(0, 100) + "..." : text
+      }"</div>
+      <div class="history-result">
+        <p>Assessment: <span class="label ${getLabelClass(
+          finalLabel
+        )}">${getLabelText(finalLabel)}</span></p>
+        <p>Models agree: ${
+          getLabelClass(data.result.roberta_result.label) ===
+          getLabelClass(data.result.ai_detector_result.label)
+            ? "Yes"
+            : "No"
+        }</p>
+      </div>
+    `;
 
     historyContent.insertBefore(historyItem, historyContent.firstChild);
 
@@ -396,7 +651,7 @@ document.addEventListener("DOMContentLoaded", () => {
         text: text,
         result: data.result,
       });
-      chrome.storage.local.set({ history: history.slice(0, 10) }); // Keep only 10 items
+      chrome.storage.local.set({ history: history.slice(0, 10) });
     });
   }
 
@@ -434,27 +689,26 @@ document.addEventListener("DOMContentLoaded", () => {
         const historyItem = document.createElement("div");
         historyItem.className = "history-item fade-in";
 
-        const finalLabel =
-          item.result.final_label === "CG" || item.result.final_label === "AI"
-            ? '<span class="label ai-label"><span class="status-dot ai-dot"></span> AI-generated</span>'
-            : '<span class="label human-label"><span class="status-dot human-dot"></span> Human-written</span>';
+        const finalLabel = item.result.final_label;
 
         historyItem.innerHTML = `
-                    <div class="history-text">"${
-                      item.text.length > 100
-                        ? item.text.substring(0, 100) + "..."
-                        : item.text
-                    }"</div>
-                    <div class="history-result">
-                        <p>Assessment: ${finalLabel}</p>
-                        <p>Models agree: ${
-                          normalizeLabel(item.result.roberta_result.label) ===
-                          normalizeLabel(item.result.ai_detector_result.label)
-                            ? "Yes"
-                            : "No"
-                        }</p>
-                    </div>
-                `;
+        <div class="history-text">"${
+          item.text.length > 100
+            ? item.text.substring(0, 100) + "..."
+            : item.text
+        }"</div>
+        <div class="history-result">
+          <p>Assessment: <span class="label ${getLabelClass(
+            finalLabel
+          )}">${getLabelText(finalLabel)}</span></p>
+          <p>Models agree: ${
+            getLabelClass(item.result.roberta_result.label) ===
+            getLabelClass(item.result.ai_detector_result.label)
+              ? "Yes"
+              : "No"
+          }</p>
+        </div>
+      `;
         historyContent.appendChild(historyItem);
       });
     });

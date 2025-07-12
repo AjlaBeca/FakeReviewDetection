@@ -5,6 +5,7 @@ import numpy as np
 from collections import defaultdict
 import XAIAnalyzer
 import re
+import json
 
 # Load model and tokenizer globally
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -17,6 +18,36 @@ model_roberta.eval()
 
 # Default temperature for scaling
 TEMPERATURE = 2.5
+
+
+# Custom JSON encoder for numpy types
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(NumpyEncoder, self).default(obj)
+
+
+def convert_numpy_types(obj):
+    """
+    Recursively convert numpy types to native Python types
+    """
+    if isinstance(obj, dict):
+        return {key: convert_numpy_types(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_types(item) for item in obj]
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    else:
+        return obj
 
 
 def predict_roberta(text, temperature=TEMPERATURE):
@@ -90,6 +121,9 @@ def explain_roberta(text):
         meaningful_features = process_attributions_with_ngrams(
             tokens, attributions, predicted_class, confidence
         )
+
+        # Convert numpy types to native Python types
+        meaningful_features = convert_numpy_types(meaningful_features)
 
         return meaningful_features
 
@@ -260,124 +294,224 @@ def explain_roberta_simple_improved(text):
 
         # Sort by absolute weight and return top features
         features.sort(key=lambda x: abs(x["weight"]), reverse=True)
-        return features[:10]
+
+        # Convert numpy types to native Python types
+        features = convert_numpy_types(features[:10])
+
+        return features
 
     except Exception as e:
         print(f"Simple explanation failed: {str(e)}")
         return [{"feature": "unable_to_analyze", "weight": 0.0, "indicates": "CG"}]
 
 
+# Updated process_attributions_with_ngrams function
 def process_attributions_with_ngrams(
-    tokens, attributions, predicted_class, confidence, top_k=15, max_n=3
+    tokens, attributions, predicted_class, confidence, top_k=10, max_n=3
 ):
-    """
-    Merge subwords to words, then aggregate to n-grams (phrases),
-    and return top weighted phrases for explanations.
-    """
-    # Step 1: Merge subwords into words and aggregate attributions
+    # Merge tokens into meaningful words
     words = []
     word_attributions = []
-
     current_word = ""
     current_attr = 0.0
+    word_complete = False
 
-    for token, attr in zip(tokens, attributions):
+    for i, (token, attr) in enumerate(zip(tokens, attributions)):
+        # Skip special tokens
         if token in ["<s>", "</s>", "<pad>", "<unk>"]:
             continue
 
-        if token.startswith("Ġ"):
-            # Save previous word if exists
+        # Handle word boundaries
+        if token.startswith("Ġ") and current_word:
+            words.append(current_word)
+            word_attributions.append(current_attr)
+            current_word = token[1:]
+            current_attr = float(attr)  # Convert to float
+            word_complete = True
+        elif token in [".", ",", "!", "?"]:
             if current_word:
                 words.append(current_word)
                 word_attributions.append(current_attr)
-            current_word = token[1:]  # Remove Ġ prefix
-            current_attr = attr
+            words.append(token)
+            word_attributions.append(float(attr))  # Convert to float
+            current_word = ""
+            current_attr = 0.0
+            word_complete = True
         else:
-            current_word += token
-            current_attr += attr
+            current_word += token.replace("Ġ", " ")
+            current_attr += float(attr)  # Convert to float
+            word_complete = False
 
-    # Add last word
     if current_word:
         words.append(current_word)
         word_attributions.append(current_attr)
 
-    # Step 2: Create n-grams (1 to max_n)
-    ngram_scores = defaultdict(float)
+    # Filter out stop words and meaningless tokens
+    STOP_WORDS = set(
+        [
+            "the",
+            "a",
+            "an",
+            "in",
+            "on",
+            "at",
+            "to",
+            "for",
+            "with",
+            "of",
+            "and",
+            "or",
+            "but",
+            "is",
+            "are",
+            "was",
+            "were",
+            "it",
+            "that",
+            "this",
+        ]
+    )
+    meaningful_words = []
+    meaningful_attrs = []
 
+    for word, attr in zip(words, word_attributions):
+        clean_word = word.strip(".,!?;:\"'()[]{}").lower()
+        if (
+            len(clean_word) > 2
+            and clean_word not in STOP_WORDS
+            and not clean_word.isdigit()
+        ):
+            meaningful_words.append(word)
+            meaningful_attrs.append(attr)
+
+    # Create n-grams with context-aware scoring
+    ngram_features = []
     for n in range(1, max_n + 1):
-        for i in range(len(words) - n + 1):
-            phrase_words = words[i : i + n]
-            phrase = " ".join(phrase_words).strip()
+        for i in range(len(meaningful_words) - n + 1):
+            ngram = " ".join(meaningful_words[i : i + n])
+            score = sum(meaningful_attrs[i : i + n]) / n  # Average score
 
-            # Sum absolute attributions of words in this phrase
-            score = sum(abs(word_attributions[j]) for j in range(i, i + n))
+            # Boost scores for meaningful phrases
+            if n > 1:
+                score *= 1.5
 
-            ngram_scores[phrase] += score
+            # Penalize generic phrases
+            if any(
+                word in ["which", "that", "this", "there"] for word in ngram.split()
+            ):
+                score *= 0.7
 
-    # Step 3: Sort ngrams by score descending
-    sorted_ngrams = sorted(ngram_scores.items(), key=lambda x: x[1], reverse=True)
+            ngram_features.append(
+                {
+                    "feature": ngram,
+                    "weight": float(score),  # Ensure it's a Python float
+                    "indicates": "OR" if score > 0 else "CG",
+                }
+            )
 
-    # Step 4: Filter out very short phrases or unwanted tokens (optional)
-    filtered_ngrams = [
-        (phrase, score)
-        for phrase, score in sorted_ngrams
-        if len(phrase) > 2 and not re.search(r"[^a-zA-Z0-9 čćžšđČĆŽŠĐ]", phrase)
-    ]
+    # Filter and sort features
+    ngram_features = sorted(
+        ngram_features, key=lambda x: abs(x["weight"]), reverse=True
+    )
 
-    # Step 5: Build output list with sign based on original attribution sum
+    # Remove duplicates and similar phrases
+    unique_features = []
+    seen_phrases = set()
 
-    output = []
-    for phrase, score in filtered_ngrams[:top_k]:
-        # Get sign of sum of attributions for phrase to know direction (OR vs CG)
-        # Find phrase start index
-        phrase_words = phrase.split()
-        indices = []
-        for i in range(len(words) - len(phrase_words) + 1):
-            if words[i : i + len(phrase_words)] == phrase_words:
-                indices.append(i)
-        if not indices:
-            continue
-        idx = indices[0]  # take first occurrence
-
-        # Sum actual signed attributions (not abs)
-        signed_sum = sum(
-            word_attributions[j] for j in range(idx, idx + len(phrase_words))
+    for feat in ngram_features:
+        core_phrase = " ".join(
+            [w for w in feat["feature"].split() if w not in STOP_WORDS]
         )
+        if core_phrase not in seen_phrases:
+            unique_features.append(feat)
+            seen_phrases.add(core_phrase)
 
-        output.append(
-            {
-                "feature": phrase,
-                "weight": float(signed_sum),
-                "indicates": "OR" if signed_sum > 0 else "CG",
-            }
-        )
+    return unique_features[:top_k]
 
-    if not output:
-        # fallback
-        output.append(
-            {
-                "feature": words[0] if words else "text",
-                "weight": 0.5 if predicted_class == 1 else -0.5,
-                "indicates": "OR" if predicted_class == 1 else "CG",
-            }
-        )
 
-    return output
+# In your prediction.py file, fix the explain_text_with_xai function:
 
 
 def explain_text_with_xai(text):
-    # Step 1: Get prediction from model
-    model_prediction = predict_roberta(text)
+    """
+    Generate comprehensive explanation using XAI analyzer
+    """
+    try:
+        # Step 1: Get prediction from model
+        model_prediction = predict_roberta(text)
+        print(f"Model prediction: {model_prediction}")
 
-    # Step 2: Get feature attributions for explanation
-    feature_attributions = explain_roberta(text)
+        # Step 2: Get feature attributions for explanation
+        feature_attributions = explain_roberta(text)
+        print(f"Feature attributions type: {type(feature_attributions)}")
+        print(
+            f"Feature attributions length: {len(feature_attributions) if isinstance(feature_attributions, list) else 'N/A'}"
+        )
 
-    # Step 3: Initialize your XAIAnalyzer
-    xai_analyzer = XAIAnalyzer()
+        # Step 3: Initialize XAI analyzer
+        from XAIAnalyzer import XAIAnalyzer
 
-    # Step 4: Generate comprehensive explanation
-    comprehensive_explanation = xai_analyzer.generate_comprehensive_explanation(
-        text, model_prediction, feature_attributions
-    )
+        xai_analyzer = XAIAnalyzer()
 
-    return comprehensive_explanation
+        # Step 4: Generate comprehensive explanation
+        comprehensive_explanation = xai_analyzer.generate_comprehensive_explanation(
+            text, model_prediction, feature_attributions
+        )
+
+        # Step 5: Convert numpy types
+        comprehensive_explanation = convert_numpy_types(comprehensive_explanation)
+
+        print(f"Generated explanation keys: {list(comprehensive_explanation.keys())}")
+        return comprehensive_explanation
+
+    except Exception as e:
+        print(f"Error in explain_text_with_xai: {e}")
+        import traceback
+
+        traceback.print_exc()
+        return {
+            "error": str(e),
+            "prediction": {"label": "Unknown", "confidence": 0.0},
+            "conclusion": "Unable to generate explanation due to error",
+        }
+
+
+# Alternative simpler approach if the above doesn't work
+def explain_text_simple(text):
+    """
+    Simple explanation without XAI analyzer
+    """
+    try:
+        # Get prediction
+        model_prediction = predict_roberta(text)
+
+        # Get feature attributions
+        feature_attributions = explain_roberta(text)
+
+        # Create simple explanation structure
+        explanation = {
+            "prediction": model_prediction,
+            "conclusion": f"The text appears to be {model_prediction['label']}-generated with {model_prediction['confidence']*100:.1f}% confidence.",
+            "detailed_analysis": {
+                "evidence_summary": {
+                    "key_indicators": (
+                        feature_attributions[:5]
+                        if isinstance(feature_attributions, list)
+                        else []
+                    )
+                }
+            },
+            "alternative_explanations": [
+                {
+                    "explanation": "Alternative interpretation available",
+                    "reasoning": "Based on different model assumptions",
+                    "likelihood": "medium",
+                }
+            ],
+        }
+
+        return convert_numpy_types(explanation)
+
+    except Exception as e:
+        print(f"Error in explain_text_simple: {e}")
+        return {"error": str(e), "conclusion": "Unable to generate explanation"}
