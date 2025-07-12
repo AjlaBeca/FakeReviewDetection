@@ -275,74 +275,77 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  /* explanation code */
   function displayExplanation(data) {
-    const result = data.result;
-    const explanations = result.explanations?.roberta;
+    try {
+      const explanation = data?.result?.explanations?.roberta;
 
-    if (explanations?.conclusion) {
-      // Render comprehensive explanation
-      explanationSection.innerHTML =
-        renderComprehensiveExplanation(explanations);
-    } else {
-      explanationSection.innerHTML = `
-            <div class="fade-in" style="text-align:center; padding:20px;">
-                <p>${explanations?.error || "No explanation available"}</p>
-            </div>`;
-    }
-  }
+      if (!explanation) {
+        explanationSection.innerHTML = `
+      <div class="fade-in" style="text-align:center; padding:20px; color:#c62828;">
+        <p><strong>No explanation available</strong></p>
+        <p>Unable to find explanation data in API response</p>
+      </div>`;
+        return;
+      }
 
-  function renderComprehensiveExplanation(explanation) {
-    return `
+      // Classify insights as AI or Human patterns
+      const insightItems = explanation.key_insights.map((insight) => {
+        const isAIPattern = insight.includes("suggests AI patterns");
+        return {
+          text: insight,
+          type: isAIPattern ? "ai-pattern" : "human-pattern",
+          icon: isAIPattern ? "🤖" : "👤",
+          stat: insight.match(/\(([^)]+)\)/)?.[1] || "",
+        };
+      });
+
+      let html = `
     <div class="fade-in explanation-container">
-        <div class="explanation-section">
-            <h3>Analysis Conclusion</h3>
-            <p class="conclusion">${explanation.conclusion}</p>
-        </div>
-        
-        <div class="explanation-section">
-            <h3>Key Linguistic Indicators</h3>
-            <div class="feature-impact">
-                ${explanation.detailed_analysis.evidence_summary.key_indicators
-                  .map((indicator) => renderIndicator(indicator))
-                  .join("")}
-            </div>
-        </div>
-        
-        ${
-          explanation.alternative_explanations.length > 0
-            ? `
-        <div class="explanation-section">
-            <h3>Alternative Interpretations</h3>
-            <ul class="alternative-list">
-                ${explanation.alternative_explanations
-                  .map(
-                    (alt) =>
-                      `<li><strong>${alt.explanation}:</strong> ${alt.reasoning}</li>`
-                  )
-                  .join("")}
-            </ul>
-        </div>`
-            : ""
-        }
-    </div>`;
-  }
+      <div class="explanation-header">
+        <div class="explanation-icon">🔍</div>
+        <h3>Research-Based Analysis</h3>
+      </div>
+      
+      <div class="conclusion">
+        ${explanation.conclusion}
+      </div>
+      
+      <div class="key-insights">
+        <h4>Key Linguistic Indicators</h4>
+        <ul class="insight-list">`;
 
-  function renderIndicator(indicator) {
-    const isAI = indicator.indicates === "AI" || indicator.indicates === "CG";
-    const barWidth = Math.min(100, Math.abs(indicator.weight) * 1000);
-    const direction = isAI ? "toward AI" : "toward human";
-
-    return `
-    <div class="feature-item ${isAI ? "ai-impact" : "human-impact"}">
-        <div class="feature-phrase">"${indicator.feature}"</div>
-        <div class="feature-direction">${direction}</div>
-        <div class="impact-bar">
-            <div class="impact-fill ${isAI ? "ai-fill" : "human-fill"}"
-                style="width: ${barWidth}%">
+      insightItems.forEach((item) => {
+        html += `
+          <li class="insight-item ${item.type}">
+            <div class="insight-icon">${item.icon}</div>
+            <div>
+              <div class="insight-text">${item.text.replace(
+                /\(([^)]+)\)/,
+                ""
+              )}</div>
+              <div class="insight-stats">${item.stat}</div>
             </div>
-        </div>
+          </li>`;
+      });
+
+      html += `
+        </ul>
+      </div>
+      
+      <div class="research-basis">
+        <em>${explanation.research_basis}</em>
+      </div>
     </div>`;
+
+      explanationSection.innerHTML = html;
+    } catch (err) {
+      console.error("Error rendering explanation:", err);
+      explanationSection.innerHTML = `
+    <div class="fade-in" style="text-align:center; padding:20px; color:#c62828;">
+      <p><strong>Error rendering explanation</strong></p>
+      <p>${err.message || "Please try again"}</p>
+    </div>`;
+    }
   }
 
   function renderShapExplanationFromArray(shapArray) {
@@ -400,33 +403,6 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("pinBtn").addEventListener("click", () => {
     chrome.tabs.create({ url: chrome.runtime.getURL("popup/analyzer.html") });
   });
-  // Fixed displayExplanation function
-  function displayExplanation(data) {
-    console.log("displayExplanation called with:", data);
-
-    const result = data.result;
-    console.log("Result object:", result);
-
-    const explanations = result.explanations?.roberta;
-    console.log("Explanations object:", explanations);
-
-    if (explanations && !explanations.error) {
-      // Check if we have the comprehensive explanation structure
-      if (explanations.conclusion || explanations.detailed_analysis) {
-        explanationSection.innerHTML =
-          renderComprehensiveExplanation(explanations);
-      } else {
-        // Handle simpler explanation format
-        explanationSection.innerHTML = renderSimpleExplanation(explanations);
-      }
-    } else {
-      explanationSection.innerHTML = `
-      <div class="fade-in" style="text-align:center; padding:20px; color:#c62828;">
-        <p><strong>No explanation available</strong></p>
-        <p>${explanations?.error || "Unable to generate explanation"}</p>
-      </div>`;
-    }
-  }
 
   // Fixed renderComprehensiveExplanation function
   function renderComprehensiveExplanation(explanation) {

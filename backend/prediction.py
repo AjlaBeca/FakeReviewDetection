@@ -1,517 +1,200 @@
 import torch
-import shap
+import spacy
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import numpy as np
-from collections import defaultdict
-import XAIAnalyzer
-import re
-import json
+from textstat import flesch_reading_ease, gunning_fog
 
-# Load model and tokenizer globally
+# Load models globally
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model_path = "../models/roberta_finetuned"
-tokenizer_roberta = AutoTokenizer.from_pretrained(model_path)
-model_roberta = AutoModelForSequenceClassification.from_pretrained(model_path).to(
-    device
-)
-model_roberta.eval()
+tokenizer = AutoTokenizer.from_pretrained(model_path)
+model = AutoModelForSequenceClassification.from_pretrained(model_path).to(device)
+model.eval()
+nlp = spacy.load("en_core_web_sm")
 
-# Default temperature for scaling
-TEMPERATURE = 2.5
+# Research-based thresholds from paper
+FEATURE_THRESHOLDS = {
+    "avg_sentence_length": (11.67, 14.31),
+    "exclamation_ratio": (0.28, 0.52),
+    "question_ratio": (0.01, 0.09),
+    "lexical_diversity": (0.72, 0.80),
+    "first_person_ratio": (4.13 / 63.22, 3.34 / 75.53),
+    "passive_ratio": (0.36, 0.47),
+    "flesch": (86.60, 77.05),
+    "gunning_fog": (6.29, 8.18),
+    "positive_phrase_ratio": (0.29, 0.20),
+}
 
-
-# Custom JSON encoder for numpy types
-class NumpyEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, np.integer):
-            return int(obj)
-        elif isinstance(obj, np.floating):
-            return float(obj)
-        elif isinstance(obj, np.ndarray):
-            return obj.tolist()
-        return super(NumpyEncoder, self).default(obj)
-
-
-def convert_numpy_types(obj):
-    """
-    Recursively convert numpy types to native Python types
-    """
-    if isinstance(obj, dict):
-        return {key: convert_numpy_types(value) for key, value in obj.items()}
-    elif isinstance(obj, list):
-        return [convert_numpy_types(item) for item in obj]
-    elif isinstance(obj, np.integer):
-        return int(obj)
-    elif isinstance(obj, np.floating):
-        return float(obj)
-    elif isinstance(obj, np.ndarray):
-        return obj.tolist()
-    else:
-        return obj
+POSITIVE_PHRASES = {
+    "great",
+    "good",
+    "excellent",
+    "awesome",
+    "nice",
+    "perfect",
+    "love",
+    "recommend",
+    "best",
+    "fantastic",
+    "wonderful",
+}
 
 
-def predict_roberta(text, temperature=TEMPERATURE):
-    inputs = tokenizer_roberta(
+def predict(text):
+    """Predict if text is AI-generated with confidence scores"""
+    inputs = tokenizer(
         text, return_tensors="pt", truncation=True, padding=True, max_length=256
     )
     inputs = {k: v.to(device) for k, v in inputs.items()}
+
     with torch.no_grad():
-        logits = model_roberta(**inputs).logits
-        scaled_logits = logits / temperature
-        probs = torch.softmax(scaled_logits, dim=1)[0].cpu().numpy()
+        logits = model(**inputs).logits
+        probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
         predicted_class = probs.argmax()
         confidence = float(probs[predicted_class])
-    label = "CG" if predicted_class == 0 else "OR"
+
     return {
-        "label": label,
+        "label": "AI" if predicted_class == 0 else "Human",
         "confidence": confidence,
-        "class_probabilities": {"CG": float(probs[0]), "OR": float(probs[1])},
+        "class_probabilities": {"AI": float(probs[0]), "Human": float(probs[1])},
     }
 
 
-def explain_roberta(text):
-    """
-    Provide meaningful explanations using gradient-based attribution
-    """
-    try:
-        # Tokenize input
-        # Tokenize and move to device
-        inputs = tokenizer_roberta(
-            text, return_tensors="pt", truncation=True, padding=True, max_length=256
-        )
-        inputs = {k: v.to(device) for k, v in inputs.items()}
+def extract_linguistic_features(text):
+    """Extract research-based linguistic features from text"""
+    doc = nlp(text)
+    sentences = list(doc.sents)
+    words = [token.text for token in doc if not token.is_punct]
 
-        # Extract tokens for display later
-        tokens = tokenizer_roberta.convert_ids_to_tokens(inputs["input_ids"][0])
+    if not words:
+        return {}
 
-        # Get embeddings from input_ids
-        input_ids = inputs["input_ids"]
-        attention_mask = inputs["attention_mask"]
+    unique_words = set(word.lower() for word in words)
 
-        # Get embeddings and set requires_grad = True for gradient-based XAI
-        embeddings = model_roberta.roberta.embeddings.word_embeddings(input_ids)
-        embeddings.requires_grad_(True)
+    # Sentence statistics
+    sentence_lengths = [len(sentence) for sentence in sentences]
+    avg_sentence_length = np.mean(sentence_lengths) if sentence_lengths else 0
 
-        # Forward pass
-        outputs = model_roberta.roberta(
-            inputs_embeds=embeddings,
-            attention_mask=inputs.get("attention_mask", None),
-            token_type_ids=inputs.get("token_type_ids", None),
-        )
+    # Punctuation
+    exclamation_ratio = text.count("!") / len(words)
+    question_ratio = text.count("?") / len(words)
 
-        # Get classifier output
-        logits = model_roberta.classifier(outputs.last_hidden_state)
-        scaled_logits = logits / TEMPERATURE
-        probs = torch.softmax(scaled_logits, dim=1)
-        predicted_class = probs.argmax(dim=1).item()
-        confidence = probs[0, predicted_class].item()
+    # Lexical diversity
+    lexical_diversity = len(unique_words) / len(words)
 
-        # Get gradients w.r.t. embeddings
-        score = logits[0, predicted_class]
+    # Pronoun counts
+    first_person = sum(
+        1
+        for token in doc
+        if token.lemma_ in {"i", "me", "my", "mine", "we", "us", "our"}
+    )
 
-        # Compute gradients
-        gradients = torch.autograd.grad(
-            outputs=score, inputs=embeddings, create_graph=False, retain_graph=False
-        )[0]
+    # Passive voice detection
+    passive_count = sum(1 for token in doc if token.dep_ == "nsubjpass")
 
-        # Get attribution by taking L2 norm of gradients for each token
-        attributions = torch.norm(gradients, dim=-1).squeeze().detach().cpu().numpy()
+    # Positive phrases
+    positive_count = sum(1 for word in words if word.lower() in POSITIVE_PHRASES)
 
-        # Process and return meaningful attributions
-        meaningful_features = process_attributions_with_ngrams(
-            tokens, attributions, predicted_class, confidence
-        )
+    # Readability scores
+    flesch = flesch_reading_ease(text)
+    gunning = gunning_fog(text)
 
-        # Convert numpy types to native Python types
-        meaningful_features = convert_numpy_types(meaningful_features)
-
-        return meaningful_features
-
-    except Exception as e:
-        print(f"Gradient explanation failed: {str(e)}")
-        # Fall back to improved simple method
-        return explain_roberta_simple_improved(text)
+    return {
+        "word_count": len(words),
+        "sentence_count": len(sentences),
+        "avg_sentence_length": avg_sentence_length,
+        "exclamation_ratio": exclamation_ratio,
+        "question_ratio": question_ratio,
+        "lexical_diversity": lexical_diversity,
+        "first_person_ratio": first_person / len(words),
+        "passive_ratio": passive_count / len(words),
+        "positive_phrase_ratio": positive_count / len(words),
+        "flesch": flesch,
+        "gunning_fog": gunning,
+    }
 
 
-def explain_roberta_simple_improved(text):
-    """
-    Improved fallback explanation using actual words from the text
-    """
-    try:
-        # Get prediction first
-        prediction_result = predict_roberta(text)
-        predicted_class = 0 if prediction_result["label"] == "CG" else 1
-        confidence = prediction_result["confidence"]
+def generate_explanation(prediction, features):
+    """Generate explanation aligned with the actual prediction"""
+    # Feature weights based on research significance
+    feature_weights = {
+        "lexical_diversity": (
+            0.8 if features.get("lexical_diversity", 0) > 0.75 else -0.8
+        ),
+        "avg_sentence_length": (
+            0.7 if features.get("avg_sentence_length", 0) > 13 else -0.7
+        ),
+        "passive_ratio": 0.6 if features.get("passive_ratio", 0) > 0.4 else -0.6,
+        "positive_phrase_ratio": (
+            -0.7 if features.get("positive_phrase_ratio", 0) > 0.25 else 0.7
+        ),
+        "flesch": -0.6 if features.get("flesch", 0) > 80 else 0.6,
+        "gunning_fog": 0.6 if features.get("gunning_fog", 0) > 7 else -0.6,
+    }
 
-        # Tokenize to get actual words
-        inputs = tokenizer_roberta(
-            text, return_tensors="pt", truncation=True, padding=True, max_length=256
-        )
-        tokens = tokenizer_roberta.convert_ids_to_tokens(inputs["input_ids"][0])
-
-        # Clean tokens and combine subwords
-        words = []
-        current_word = ""
-
-        for token in tokens:
-            if token in ["<s>", "</s>", "<pad>", "<unk>"]:
-                continue
-
-            if token.startswith("Ġ"):
-                if current_word:
-                    words.append(current_word.strip())
-                current_word = token[1:]  # Remove Ġ prefix
-            else:
-                current_word += token
-
-        if current_word:
-            words.append(current_word.strip())
-
-        # Filter out short words and common words
-        meaningful_words = [
-            w
-            for w in words
-            if len(w) > 2
-            and w.lower()
-            not in [
-                "the",
-                "and",
-                "for",
-                "are",
-                "but",
-                "not",
-                "you",
-                "all",
-                "can",
-                "had",
-                "her",
-                "was",
-                "one",
-                "our",
-                "out",
-                "day",
-                "get",
-                "has",
-                "him",
-                "his",
-                "how",
-                "its",
-                "may",
-                "new",
-                "now",
-                "old",
-                "see",
-                "two",
-                "who",
-                "boy",
-                "did",
-                "man",
-                "way",
-                "too",
-            ]
-        ]
-
-        # Create features from actual words in the text
-        features = []
-
-        # Define some pattern-based scoring
-        cg_patterns = [
-            "perfect",
-            "amazing",
-            "excellent",
-            "outstanding",
-            "incredible",
-            "fantastic",
-            "absolutely",
-            "definitely",
-            "highly",
-            "recommend",
-            "must-have",
-            "flawless",
-        ]
-
-        or_patterns = [
-            "okay",
-            "fine",
-            "decent",
-            "alright",
-            "pretty",
-            "quite",
-            "somewhat",
-            "fairly",
-            "rather",
-            "maybe",
-            "probably",
-            "seems",
-            "think",
-            "feel",
-        ]
-
-        # Score words based on patterns and text characteristics
-        for word in meaningful_words[:15]:  # Limit to top 15 words
-            word_lower = word.lower().strip(".,!?")
-
-            # Base score based on prediction
-            base_score = 0.3 if predicted_class == 1 else -0.3
-
-            # Adjust based on patterns
-            if word_lower in cg_patterns:
-                score = -0.7  # Strong CG indicator
-                indicates = "CG"
-            elif word_lower in or_patterns:
-                score = 0.6  # Strong OR indicator
-                indicates = "OR"
-            else:
-                # Use some heuristics based on word characteristics
-                if len(word) > 8:  # Long words might be more human
-                    score = base_score + 0.2
-                elif word.isupper():  # ALL CAPS might be more CG
-                    score = base_score - 0.3
-                else:
-                    score = base_score
-
-                indicates = "OR" if score > 0 else "CG"
-
-            features.append(
-                {"feature": word, "weight": float(score), "indicates": indicates}
-            )
-
-        # If we don't have enough features, add the most meaningful ones
-        if len(features) < 3:
-            # Add most distinctive words from the text
-            text_words = text.split()
-            for word in text_words[:5]:
-                if word.lower().strip(".,!?") not in [
-                    f["feature"].lower() for f in features
-                ]:
-                    features.append(
-                        {
-                            "feature": word.strip(".,!?"),
-                            "weight": 0.4 if predicted_class == 1 else -0.4,
-                            "indicates": "OR" if predicted_class == 1 else "CG",
-                        }
-                    )
-
-        # Sort by absolute weight and return top features
-        features.sort(key=lambda x: abs(x["weight"]), reverse=True)
-
-        # Convert numpy types to native Python types
-        features = convert_numpy_types(features[:10])
-
-        return features
-
-    except Exception as e:
-        print(f"Simple explanation failed: {str(e)}")
-        return [{"feature": "unable_to_analyze", "weight": 0.0, "indicates": "CG"}]
-
-
-# Updated process_attributions_with_ngrams function
-def process_attributions_with_ngrams(
-    tokens, attributions, predicted_class, confidence, top_k=10, max_n=3
-):
-    # Merge tokens into meaningful words
-    words = []
-    word_attributions = []
-    current_word = ""
-    current_attr = 0.0
-    word_complete = False
-
-    for i, (token, attr) in enumerate(zip(tokens, attributions)):
-        # Skip special tokens
-        if token in ["<s>", "</s>", "<pad>", "<unk>"]:
-            continue
-
-        # Handle word boundaries
-        if token.startswith("Ġ") and current_word:
-            words.append(current_word)
-            word_attributions.append(current_attr)
-            current_word = token[1:]
-            current_attr = float(attr)  # Convert to float
-            word_complete = True
-        elif token in [".", ",", "!", "?"]:
-            if current_word:
-                words.append(current_word)
-                word_attributions.append(current_attr)
-            words.append(token)
-            word_attributions.append(float(attr))  # Convert to float
-            current_word = ""
-            current_attr = 0.0
-            word_complete = True
-        else:
-            current_word += token.replace("Ġ", " ")
-            current_attr += float(attr)  # Convert to float
-            word_complete = False
-
-    if current_word:
-        words.append(current_word)
-        word_attributions.append(current_attr)
-
-    # Filter out stop words and meaningless tokens
-    STOP_WORDS = set(
+    # Sort features by absolute weight
+    sorted_features = sorted(
         [
-            "the",
-            "a",
-            "an",
-            "in",
-            "on",
-            "at",
-            "to",
-            "for",
-            "with",
-            "of",
-            "and",
-            "or",
-            "but",
-            "is",
-            "are",
-            "was",
-            "were",
-            "it",
-            "that",
-            "this",
-        ]
+            {"feature": k, "weight": v}
+            for k, v in feature_weights.items()
+            if k in features
+        ],
+        key=lambda x: abs(x["weight"]),
+        reverse=True,
     )
-    meaningful_words = []
-    meaningful_attrs = []
 
-    for word, attr in zip(words, word_attributions):
-        clean_word = word.strip(".,!?;:\"'()[]{}").lower()
-        if (
-            len(clean_word) > 2
-            and clean_word not in STOP_WORDS
-            and not clean_word.isdigit()
-        ):
-            meaningful_words.append(word)
-            meaningful_attrs.append(attr)
+    # Generate natural language explanations
+    key_insights = []
+    for feat in sorted_features[:3]:
+        feature = feat["feature"]
+        value = features[feature]
+        human_mean, ai_mean = FEATURE_THRESHOLDS[feature]
 
-    # Create n-grams with context-aware scoring
-    ngram_features = []
-    for n in range(1, max_n + 1):
-        for i in range(len(meaningful_words) - n + 1):
-            ngram = " ".join(meaningful_words[i : i + n])
-            score = sum(meaningful_attrs[i : i + n]) / n  # Average score
-
-            # Boost scores for meaningful phrases
-            if n > 1:
-                score *= 1.5
-
-            # Penalize generic phrases
-            if any(
-                word in ["which", "that", "this", "there"] for word in ngram.split()
-            ):
-                score *= 0.7
-
-            ngram_features.append(
-                {
-                    "feature": ngram,
-                    "weight": float(score),  # Ensure it's a Python float
-                    "indicates": "OR" if score > 0 else "CG",
-                }
+        if feat["weight"] > 0:
+            insight = (
+                f"Higher {feature.replace('_', ' ')} ({value:.2f} vs human avg {human_mean:.2f}) "
+                f"suggests AI patterns"
             )
+        else:
+            insight = (
+                f"Lower {feature.replace('_', ' ')} ({value:.2f} vs human avg {human_mean:.2f}) "
+                f"suggests human patterns"
+            )
+        key_insights.append(insight)
 
-    # Filter and sort features
-    ngram_features = sorted(
-        ngram_features, key=lambda x: abs(x["weight"]), reverse=True
+    # Final conclusion - ALIGNED WITH ACTUAL PREDICTION
+    conclusion = (
+        "This text shows strong indicators of AI-generated content"
+        if prediction["label"] == "AI"
+        else "This text appears predominantly human-written"
     )
 
-    # Remove duplicates and similar phrases
-    unique_features = []
-    seen_phrases = set()
+    # Add confidence qualifier
+    if prediction["confidence"] < 0.7:
+        conclusion += ", though with some uncertainty"
+    elif prediction["confidence"] > 0.9:
+        conclusion += " with high confidence"
 
-    for feat in ngram_features:
-        core_phrase = " ".join(
-            [w for w in feat["feature"].split() if w not in STOP_WORDS]
-        )
-        if core_phrase not in seen_phrases:
-            unique_features.append(feat)
-            seen_phrases.add(core_phrase)
-
-    return unique_features[:top_k]
+    return {
+        "key_insights": key_insights,
+        "conclusion": conclusion,
+        "research_basis": "Analysis based on linguistic patterns from academic research",
+    }
 
 
-# In your prediction.py file, fix the explain_text_with_xai function:
+def analyze_text(text, explain=False):
+    """Main API endpoint for text analysis"""
+    prediction = predict(text)
 
+    if not explain:
+        return {"prediction": prediction}
 
-def explain_text_with_xai(text):
-    """
-    Generate comprehensive explanation using XAI analyzer
-    """
     try:
-        # Step 1: Get prediction from model
-        model_prediction = predict_roberta(text)
-        print(f"Model prediction: {model_prediction}")
-
-        # Step 2: Get feature attributions for explanation
-        feature_attributions = explain_roberta(text)
-        print(f"Feature attributions type: {type(feature_attributions)}")
-        print(
-            f"Feature attributions length: {len(feature_attributions) if isinstance(feature_attributions, list) else 'N/A'}"
-        )
-
-        # Step 3: Initialize XAI analyzer
-        from XAIAnalyzer import XAIAnalyzer
-
-        xai_analyzer = XAIAnalyzer()
-
-        # Step 4: Generate comprehensive explanation
-        comprehensive_explanation = xai_analyzer.generate_comprehensive_explanation(
-            text, model_prediction, feature_attributions
-        )
-
-        # Step 5: Convert numpy types
-        comprehensive_explanation = convert_numpy_types(comprehensive_explanation)
-
-        print(f"Generated explanation keys: {list(comprehensive_explanation.keys())}")
-        return comprehensive_explanation
-
+        features = extract_linguistic_features(text)
+        explanation = generate_explanation(prediction, features)
+        return {"prediction": prediction, "explanation": explanation}
     except Exception as e:
-        print(f"Error in explain_text_with_xai: {e}")
-        import traceback
-
-        traceback.print_exc()
         return {
-            "error": str(e),
-            "prediction": {"label": "Unknown", "confidence": 0.0},
-            "conclusion": "Unable to generate explanation due to error",
+            "prediction": prediction,
+            "error": f"Explanation generation failed: {str(e)}",
         }
-
-
-# Alternative simpler approach if the above doesn't work
-def explain_text_simple(text):
-    """
-    Simple explanation without XAI analyzer
-    """
-    try:
-        # Get prediction
-        model_prediction = predict_roberta(text)
-
-        # Get feature attributions
-        feature_attributions = explain_roberta(text)
-
-        # Create simple explanation structure
-        explanation = {
-            "prediction": model_prediction,
-            "conclusion": f"The text appears to be {model_prediction['label']}-generated with {model_prediction['confidence']*100:.1f}% confidence.",
-            "detailed_analysis": {
-                "evidence_summary": {
-                    "key_indicators": (
-                        feature_attributions[:5]
-                        if isinstance(feature_attributions, list)
-                        else []
-                    )
-                }
-            },
-            "alternative_explanations": [
-                {
-                    "explanation": "Alternative interpretation available",
-                    "reasoning": "Based on different model assumptions",
-                    "likelihood": "medium",
-                }
-            ],
-        }
-
-        return convert_numpy_types(explanation)
-
-    except Exception as e:
-        print(f"Error in explain_text_simple: {e}")
-        return {"error": str(e), "conclusion": "Unable to generate explanation"}

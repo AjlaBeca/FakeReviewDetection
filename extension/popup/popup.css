@@ -282,6 +282,148 @@ h1 {
   }
 }
 /* Explanation section */
+
+/* ===== ENHANCED EXPLANATION STYLES ===== */
+.explanation-container {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 20px;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+}
+
+.explanation-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.explanation-title {
+  font-size: 18px;
+  color: #4a00e0;
+  margin: 0;
+}
+
+.explanation-icon {
+  font-size: 24px;
+  color: #6a11cb;
+}
+
+.conclusion-box {
+  background: linear-gradient(to right, #f0f7ff, #e3f2fd);
+  padding: 16px;
+  border-radius: 10px;
+  border-left: 4px solid #4a00e0;
+  margin-bottom: 20px;
+  font-size: 15px;
+  line-height: 1.5;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
+}
+
+.key-insights-title {
+  font-size: 16px;
+  color: #333;
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.key-insights-title::before {
+  content: "";
+  display: block;
+  width: 6px;
+  height: 6px;
+  background: #6a11cb;
+  border-radius: 50%;
+}
+
+.insight-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.insight-item {
+  padding: 14px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: white;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.insight-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+}
+
+.insight-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 4px;
+}
+
+.ai-pattern::before {
+  background: linear-gradient(to bottom, #ff416c, #ff4b2b);
+}
+
+.human-pattern::before {
+  background: linear-gradient(to bottom, #2196f3, #21cbf3);
+}
+
+.insight-icon {
+  font-size: 20px;
+  margin-top: 2px;
+}
+
+.ai-pattern .insight-icon {
+  color: #ff416c;
+}
+
+.human-pattern .insight-icon {
+  color: #2196f3;
+}
+
+.insight-text {
+  flex: 1;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.insight-stats {
+  font-size: 13px;
+  color: #666;
+  background: rgba(0, 0, 0, 0.03);
+  padding: 4px 8px;
+  border-radius: 6px;
+  margin-top: 8px;
+  display: inline-block;
+}
+
+.research-basis {
+  font-style: italic;
+  color: #666;
+  font-size: 14px;
+  text-align: center;
+  margin-top: 20px;
+  padding: 15px;
+  background: rgba(106, 17, 203, 0.05);
+  border-radius: 8px;
+}
+
 .explanation-section {
   margin-top: 25px;
   padding: 15px;
@@ -544,33 +686,6 @@ body.click-mode {
 
 /* start of explanation section css*/
 
-.explanation-container {
-  padding: 15px;
-  background: #f8f9fa;
-  border-radius: 8px;
-  margin-top: 10px;
-}
-
-.explanation-section {
-  margin-bottom: 20px;
-}
-
-.explanation-section h3 {
-  color: #333;
-  margin-bottom: 10px;
-  font-size: 16px;
-  border-bottom: 2px solid #e0e0e0;
-  padding-bottom: 5px;
-}
-
-.conclusion {
-  background: #e3f2fd;
-  padding: 12px;
-  border-radius: 6px;
-  border-left: 4px solid #2196f3;
-  margin-bottom: 15px;
-}
-
 .feature-impact {
   display: flex;
   flex-direction: column;
@@ -637,14 +752,6 @@ body.click-mode {
 .alternative-list {
   list-style: none;
   padding: 0;
-}
-
-.alternative-list li {
-  padding: 8px;
-  background: white;
-  border-radius: 6px;
-  margin-bottom: 8px;
-  border-left: 3px solid #ff9800;
 }
 
 .likelihood {
