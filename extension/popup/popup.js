@@ -288,16 +288,12 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // Classify insights as AI or Human patterns
-      const insightItems = explanation.key_insights.map((insight) => {
-        const isAIPattern = insight.includes("suggests AI patterns");
-        return {
-          text: insight,
-          type: isAIPattern ? "ai-pattern" : "human-pattern",
-          icon: isAIPattern ? "🤖" : "👤",
-          stat: insight.match(/\(([^)]+)\)/)?.[1] || "",
-        };
-      });
+      const insightItems = explanation.key_insights.map((insight) => ({
+        text: insight.text,
+        type: insight.type || "ambiguous",
+        icon: insight.icon || "❓",
+        stat: insight.text.match(/\(([^)]+)\)/)?.[1] || "",
+      }));
 
       let html = `
     <div class="fade-in explanation-container">
@@ -310,8 +306,8 @@ document.addEventListener("DOMContentLoaded", () => {
         ${explanation.conclusion}
       </div>
       
-      <div class="key-insights">
-        <h4>Key Linguistic Indicators</h4>
+      <div class="key-insights" style="margin-top: 20px;">
+        <h4 style="margin-bottom: 10px;"> Key Linguistic Indicators</h4>
         <ul class="insight-list">`;
 
       insightItems.forEach((item) => {

@@ -384,6 +384,11 @@ h1 {
   background: linear-gradient(to bottom, #2196f3, #21cbf3);
 }
 
+.insight-item.ambiguous,
+.insight-item.ambiguous-pattern {
+  border-left: 4px solid #febe00;
+}
+
 .insight-icon {
   font-size: 20px;
   margin-top: 2px;
