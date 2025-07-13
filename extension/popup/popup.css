@@ -126,9 +126,7 @@ h1 {
 .result-content,
 .history-result,
 .history-text,
-.explanation-section,
-.lime-explanation,
-.shap-explanation {
+.explanation-section {
   font-size: 13px;
   line-height: 1.5;
 }
@@ -466,24 +464,6 @@ h1 {
   display: block;
 }
 
-/* SHAP styles */
-.shap-explanation {
-  line-height: 1.8;
-  font-size: 16px;
-  background: #fff;
-  padding: 15px;
-  border-radius: 8px;
-  margin-bottom: 15px;
-}
-
-.shap-token {
-  padding: 2px 4px;
-  margin: 0 1px;
-  border-radius: 3px;
-  display: inline-block;
-  white-space: pre-wrap;
-}
-
 .legend {
   display: flex;
   gap: 20px;
@@ -505,23 +485,6 @@ h1 {
 
 .human-color {
   background-color: #ccccff;
-}
-
-/* LIME styles */
-.lime-explanation table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.lime-explanation th,
-.lime-explanation td {
-  padding: 8px 10px;
-  text-align: left;
-  border-bottom: 1px solid #eee;
-}
-
-.lime-explanation th {
-  background-color: #f1f1f1;
 }
 
 .ai-feature {

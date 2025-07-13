@@ -30,7 +30,6 @@ def predict_fake_review(text):
         predicted_class = probs.argmax()
         confidence = float(probs[predicted_class])
 
-    # Check the model's config or docs to confirm labels; usually 0 = genuine, 1 = fake
     label = "Fake" if predicted_class == 1 else "Genuine"
 
     return {

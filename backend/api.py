@@ -3,10 +3,8 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from enseble import ensemble_predict
 
-# Initialize app
 app = FastAPI()
 
-# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -16,7 +14,6 @@ app.add_middleware(
 )
 
 
-# Input model
 class InputText(BaseModel):
     text: str
     explain: bool = False

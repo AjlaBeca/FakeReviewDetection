@@ -4,7 +4,6 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import numpy as np
 from textstat import flesch_reading_ease, gunning_fog
 
-# Load models globally
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model_path = "../models/roberta_finetuned"
 tokenizer = AutoTokenizer.from_pretrained(model_path)
@@ -12,7 +11,7 @@ model = AutoModelForSequenceClassification.from_pretrained(model_path).to(device
 model.eval()
 nlp = spacy.load("en_core_web_sm")
 
-# Research-based thresholds from paper
+# research-based thresholds from the paper
 FEATURE_THRESHOLDS = {
     "avg_sentence_length": (11.67, 14.31),
     "exclamation_ratio": (0.28, 0.52),
@@ -85,7 +84,6 @@ def generate_explanation(prediction, features):
     """Generate explanation aligned with actual prediction using research-based thresholds"""
     key_insights = []
 
-    # Define base weights per feature (can be tuned)
     base_weights = {
         "lexical_diversity": 0.8,
         "avg_sentence_length": 0.7,
@@ -94,7 +92,7 @@ def generate_explanation(prediction, features):
     }
 
     feature_weights = {}
-    tolerance_ratio = 0.1  # 5% of human average is considered ambiguous
+    tolerance_ratio = 0.1
 
     for feature, (human_avg, ai_avg) in FEATURE_THRESHOLDS.items():
         value = features.get(feature)
@@ -106,7 +104,6 @@ def generate_explanation(prediction, features):
         tolerance = tolerance_ratio * human_avg
 
         if abs(human_diff - ai_diff) < tolerance:
-            # Too close to distinguish reliably
             weight = 0.0
             insight = f"{feature.replace('_', ' ').capitalize()} is close to both human ({human_avg:.2f}) and AI ({ai_avg:.2f}) averages: ambiguous pattern"
         else:
@@ -120,7 +117,6 @@ def generate_explanation(prediction, features):
         feature_weights[feature] = weight
         key_insights.append({"feature": feature, "text": insight, "weight": weight})
 
-    # Sort and limit top 5 impactful insights
     key_insights = sorted(key_insights, key=lambda x: abs(x["weight"]), reverse=True)[
         :5
     ]
@@ -131,7 +127,7 @@ def generate_explanation(prediction, features):
         else "This text appears predominantly human-written."
     )
 
-    # Confidence qualifier
+    # confidence qualifier
     if prediction["confidence"] < 0.7:
         conclusion += " However, the model expresses some uncertainty."
     elif prediction["confidence"] > 0.9:
@@ -175,101 +171,3 @@ def analyze_text(text, explain=False):
             "prediction": prediction,
             "error": f"Explanation generation failed: {str(e)}",
         }
-
-
-POSITIVE_PHRASES = {
-    "great",
-    "good",
-    "excellent",
-    "awesome",
-    "perfect",
-    "love",
-    "nice",
-    "glad",
-    "like",
-    "love",
-    "cute",
-    "stylish",
-    "trendy",
-    "great",
-    "recommend",
-    "best",
-    "fantastic",
-    "wonderful",
-    "amazing",
-    "superb",
-    "outstanding",
-    "fabulous",
-    "terrific",
-    "super",
-    "fine",
-    "pleasant",
-    "satisfied",
-    "happy",
-    "delighted",
-    "pleased",
-    "impressed",
-    "top",
-    "exceptional",
-    "incredible",
-    "favorite",
-    "admire",
-    "enjoy",
-    "smooth",
-    "easy",
-    "effective",
-    "quality",
-    "valuable",
-    "worth",
-    "beautiful",
-    "brilliant",
-    "cool",
-    "decent",
-    "splendid",
-    "stellar",
-    "satisfactory",
-    "acceptable",
-    "admirable",
-    "first-class",
-    "marvelous",
-    "remarkable",
-    "superior",
-    "agreeable",
-    "charming",
-    "divine",
-    "enjoyable",
-    "favorable",
-    "heavenly",
-    "pleasurable",
-    "satisfying",
-    "positive",
-    "loved",
-    "fav",
-    "prefer",
-    "choice",
-    "prime",
-    "select",
-    "premium",
-    "optimal",
-    "ideal",
-    "suitable",
-    "appreciated",
-    "approved",
-    "cherished",
-    "esteemed",
-    "prized",
-    "treasured",
-    "valued",
-    "praise",
-    "glowing",
-    "enthusiastic",
-    "encouraging",
-    "supportive",
-    "upbeat",
-    "optimistic",
-    "hopeful",
-    "promising",
-    "bright",
-    "fortunate",
-    "lucky",
-}

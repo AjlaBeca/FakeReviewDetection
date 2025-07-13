@@ -15,7 +15,6 @@ document.addEventListener("DOMContentLoaded", () => {
   explanationSection.style.display = "none";
   toggleExplanationBtn.style.display = "none";
 
-  // Store current analysis data
   let currentAnalysis = null;
 
   // Analyze button event
@@ -48,7 +47,6 @@ document.addEventListener("DOMContentLoaded", () => {
       explanationSection.style.display = "block";
       toggleExplanationBtn.innerHTML = "<i>🔍</i> Hide Explanation";
 
-      // Only load explanation if we have analysis data and haven't loaded it yet
       if (currentAnalysis && !currentAnalysis.explanationLoaded) {
         loadExplanation();
       }
@@ -62,7 +60,6 @@ document.addEventListener("DOMContentLoaded", () => {
   historyBtn.addEventListener("click", toggleHistory);
 
   function analyzeText(text) {
-    // Reset explanation state
     explanationSection.style.display = "none";
     toggleExplanationBtn.innerHTML = "<i>🔍</i> Show Explanation";
     currentAnalysis = {
@@ -79,7 +76,6 @@ document.addEventListener("DOMContentLoaded", () => {
             </div>
         `;
 
-    // Request without explanation initially
     fetch("http://127.0.0.1:8000/predict", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -92,7 +88,6 @@ document.addEventListener("DOMContentLoaded", () => {
         toggleExplanationBtn.style.display = "inline-block";
         addToHistory(text, data);
 
-        // Store analysis data
         currentAnalysis.data = data;
       })
       .catch((err) => {
@@ -142,17 +137,13 @@ document.addEventListener("DOMContentLoaded", () => {
             `;
       });
   }
+
   function displayResult(data) {
     const result = data.result;
     const roberta = result.roberta_result;
     const aiDetector = result.ai_detector_result;
     const fakeReview = result.fake_review_result;
     const finalLabel = result.final_label;
-
-    const finalLabelDisplay = getFriendlyLabel(finalLabel);
-    const robertaLabelDisplay = getFriendlyLabel(roberta.label);
-    const aiLabelDisplay = getFriendlyLabel(aiDetector.label);
-    const fakeLabelDisplay = fakeReview.label;
 
     const robertaPercentage = Math.round(roberta.confidence * 100);
     const aiPercentage = Math.round(aiDetector.confidence * 100);
@@ -228,7 +219,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (icon) {
       event.preventDefault();
 
-      // If this icon already has its tooltip visible, remove it (toggle)
       if (
         existingTooltip &&
         existingTooltip.dataset.owner === icon.dataset.id
@@ -237,10 +227,9 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // Remove any other tooltip
       document.querySelectorAll(".info-box").forEach((box) => box.remove());
 
-      // Tooltip text mapping
+      // tooltip text mapping
       const tooltipTexts = {
         roberta:
           "This model detects AI-generated text by analyzing linguistic patterns and writing style.",
@@ -253,14 +242,14 @@ document.addEventListener("DOMContentLoaded", () => {
       const tooltipText = tooltipTexts[id];
       if (!tooltipText) return;
 
-      // Create tooltip
+      // create tooltip
       const tooltip = document.createElement("div");
       tooltip.className = "info-box";
       tooltip.textContent = tooltipText;
-      tooltip.dataset.owner = id; // Mark the tooltip as belonging to this icon
+      tooltip.dataset.owner = id;
       document.body.appendChild(tooltip);
 
-      // Position it
+      // positioning tooltip
       const rect = icon.getBoundingClientRect();
       const top = rect.bottom + window.scrollY + 8;
       const left = Math.min(
@@ -270,7 +259,7 @@ document.addEventListener("DOMContentLoaded", () => {
       tooltip.style.top = `${top}px`;
       tooltip.style.left = `${left}px`;
     } else {
-      // Clicked outside: remove any tooltip
+      // clicked outside: remove any tooltip
       document.querySelectorAll(".info-box").forEach((box) => box.remove());
     }
   });
@@ -344,218 +333,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function renderShapExplanationFromArray(shapArray) {
-    if (!Array.isArray(shapArray)) {
-      return "<p>No SHAP explanation available</p>";
-    }
-
-    const significantFeatures = shapArray
-      .filter((item) => item && item.feature && typeof item.weight === "number")
-      .map((item) => ({
-        ...item,
-        feature: item.feature
-          .replace(/Ġ/g, " ")
-          .replace(/âĢ/g, "'")
-          .replace(/Ļ/g, "")
-          .replace(/[^\w\s.,!?'"čćžšđČĆŽŠĐ-]/g, "") // ⚠️ now preserves Bosnian letters
-          .trim(),
-      }))
-      .filter((item) => item.feature.length > 1);
-
-    if (significantFeatures.length === 0) {
-      return `
-      <div class="fade-in" style="text-align:center; padding:20px;">
-        <p>No significant features detected</p>
-        <p class="threshold-note">Only phrases with meaningful impact are shown</p>
-      </div>`;
-    }
-
-    significantFeatures.sort((a, b) => Math.abs(b.weight) - Math.abs(a.weight));
-
-    let html = '<div class="fade-in">';
-    html += "<h3>Key Phrases Influencing Prediction</h3>";
-    html += '<div class="feature-impact">';
-
-    for (const item of significantFeatures) {
-      const isAI = item.weight > 0;
-      const barWidth = Math.min(100, Math.abs(item.weight) * 1000);
-
-      html += `
-      <div class="feature-item ${isAI ? "ai-impact" : "human-impact"}">
-        <span>"${item.feature}"</span>
-        <div class="impact-bar">
-          <div class="impact-fill ${isAI ? "ai-fill" : "human-fill"}"
-            style="width: ${barWidth}%">
-          </div>
-        </div>
-        <span>${isAI ? "AI" : "Human"}</span>
-      </div>`;
-    }
-
-    html += "</div></div>";
-    return html;
-  }
-
   document.getElementById("pinBtn").addEventListener("click", () => {
     chrome.tabs.create({ url: chrome.runtime.getURL("popup/analyzer.html") });
   });
-
-  // Fixed renderComprehensiveExplanation function
-  function renderComprehensiveExplanation(explanation) {
-    console.log("renderComprehensiveExplanation called with:", explanation);
-
-    let html = '<div class="fade-in explanation-container">';
-
-    // Analysis Conclusion
-    if (explanation.conclusion) {
-      html += `
-      <div class="explanation-section">
-        <h3>Analysis Conclusion</h3>
-        <p class="conclusion">${explanation.conclusion}</p>
-      </div>`;
-    }
-
-    // Key Linguistic Indicators
-    const keyIndicators =
-      explanation.detailed_analysis?.evidence_summary?.key_indicators ||
-      explanation.key_indicators ||
-      [];
-
-    if (keyIndicators.length > 0) {
-      html += `
-      <div class="explanation-section">
-        <h3>Key Linguistic Indicators</h3>
-        <div class="feature-impact">
-          ${keyIndicators
-            .map((indicator) => renderIndicator(indicator))
-            .join("")}
-        </div>
-      </div>`;
-    }
-
-    // Alternative Explanations
-    const alternatives = explanation.alternative_explanations || [];
-    if (alternatives.length > 0) {
-      html += `
-      <div class="explanation-section">
-        <h3>Alternative Interpretations</h3>
-        <ul class="alternative-list">
-          ${alternatives
-            .map(
-              (alt) => `
-            <li>
-              <strong>${alt.explanation}:</strong> ${alt.reasoning}
-              <span class="likelihood">(${alt.likelihood} likelihood)</span>
-            </li>
-          `
-            )
-            .join("")}
-        </ul>
-      </div>`;
-    }
-
-    // Reasoning Chain
-    const reasoningChain =
-      explanation.reasoning_steps || explanation.reasoning_chain || [];
-    if (reasoningChain.length > 0) {
-      html += `
-      <div class="explanation-section">
-        <h3>Analysis Steps</h3>
-        <div class="reasoning-chain">
-          ${reasoningChain
-            .map(
-              (step, index) => `
-            <div class="reasoning-step">
-              <div class="step-number">${step.step || index + 1}</div>
-              <div class="step-content">
-                <strong>${step.description}</strong>
-                <p>${step.finding}</p>
-                <small class="step-significance">${step.significance}</small>
-              </div>
-            </div>
-          `
-            )
-            .join("")}
-        </div>
-      </div>`;
-    }
-
-    html += "</div>";
-    return html;
-  }
-
-  // New function to handle simpler explanation formats
-  function renderSimpleExplanation(explanation) {
-    console.log("renderSimpleExplanation called with:", explanation);
-
-    let html = '<div class="fade-in explanation-container">';
-
-    // If explanation is an array (feature attributions)
-    if (Array.isArray(explanation)) {
-      html += `
-      <div class="explanation-section">
-        <h3>Key Features</h3>
-        <div class="feature-impact">
-          ${explanation.map((feature) => renderIndicator(feature)).join("")}
-        </div>
-      </div>`;
-    } else if (typeof explanation === "object") {
-      // If explanation is an object, try to render its properties
-      html += `
-      <div class="explanation-section">
-        <h3>Analysis Details</h3>
-        <pre style="background: #f5f5f5; padding: 10px; border-radius: 5px; overflow-x: auto;">
-          ${JSON.stringify(explanation, null, 2)}
-        </pre>
-      </div>`;
-    } else {
-      html += `
-      <div class="explanation-section">
-        <p>${explanation}</p>
-      </div>`;
-    }
-
-    html += "</div>";
-    return html;
-  }
-
-  // Fixed renderIndicator function
-  function renderIndicator(indicator) {
-    if (!indicator || !indicator.feature) {
-      return '<div class="feature-item">Invalid indicator</div>';
-    }
-
-    const isAI = indicator.indicates === "AI" || indicator.indicates === "CG";
-    const weight = parseFloat(indicator.weight) || 0;
-    const barWidth = Math.min(100, Math.abs(weight) * 50); // Adjusted multiplier
-    const direction = isAI ? "toward AI" : "toward Human";
-
-    return `
-    <div class="feature-item ${isAI ? "ai-impact" : "human-impact"}">
-      <div class="feature-phrase">"${indicator.feature}"</div>
-      <div class="feature-direction">${direction}</div>
-      <div class="impact-bar">
-        <div class="impact-fill ${isAI ? "ai-fill" : "human-fill"}"
-             style="width: ${barWidth}%">
-        </div>
-      </div>
-      <div class="feature-weight">Weight: ${weight.toFixed(3)}</div>
-    </div>`;
-  }
-  function getFriendlyLabel(label) {
-    if (label === "CG" || label === "AI") return "AI-generated";
-    if (label === "OR" || label === "Human") return "Human-written";
-    if (label === "Fake") return "Fake Review";
-    if (label === "Genuine") return "Genuine Review";
-    return label;
-  }
-
-  function normalizeLabel(label) {
-    if (label === "CG" || label === "AI") return "AI";
-    if (label === "OR" || label === "Human") return "Human";
-    if (label === "Fake") return "AI";
-    return label;
-  }
 
   function getLabelClass(label) {
     if (
@@ -590,7 +370,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return "This text appears to be human-written and genuine";
   }
 
-  // Function to add to history
+  // add review to history
   function addToHistory(text, data) {
     const historyItem = document.createElement("div");
     historyItem.className = "history-item fade-in";
@@ -616,7 +396,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     historyContent.insertBefore(historyItem, historyContent.firstChild);
 
-    // Save to storage
+    // save to storage
     chrome.storage.local.get({ history: [] }, (result) => {
       const history = result.history;
       history.unshift({
@@ -627,7 +407,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Function to toggle history visibility
+  // toggle history visibility
   function toggleHistory() {
     if (historyContainer.style.display === "block") {
       historyContainer.style.display = "none";
@@ -640,7 +420,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Function to display history
+  // function to display history
   function displayHistory() {
     historyContent.innerHTML = "";
 

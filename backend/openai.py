@@ -1,7 +1,6 @@
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
 
-# Initialize once
 device = torch.device("cpu")
 tokenizer_ai = None
 model_ai = None
