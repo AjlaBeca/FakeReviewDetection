@@ -497,6 +497,16 @@ h1 {
   font-weight: bold;
 }
 
+.suspicious-label {
+  background-color: #fff3e0;
+  color: #ef6c00;
+}
+
+#result .tip-suspicious {
+  background: #fff8e1;
+  border-left: 4px solid #ffc107;
+}
+
 /* Explanation toggle */
 .explanation-toggle {
   margin-top: 15px;
@@ -607,13 +617,12 @@ h1 {
   box-shadow: 0 6px 20px rgba(0, 114, 255, 0.4);
 }
 
-/* Optional: click mode cursor effect */
 body.click-mode {
   cursor: crosshair !important;
 }
 
-.confidence-fill.fake {
-  background-color: #4caf50; /* nice green for fake review */
+.confidence-fill.suspicious {
+  background: linear-gradient(to right, #ffc107, #ff9800); /* Yellow-orange */
 }
 
 .confidence-fill.roberta {
@@ -784,7 +793,37 @@ body.click-mode {
   background-color: #fff3e0;
   color: #ef6c00;
 }
-/* Add to CSS */
+
 .confidence-fill.fake {
   background-color: #4caf50;
+}
+
+.model-agreement {
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 8px;
+  margin: 15px 0;
+  font-size: 14px;
+}
+
+.model-breakdown {
+  margin-top: 20px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.model-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.model-name {
+  font-weight: bold;
+}
+
+.model-value {
+  font-weight: 500;
 }

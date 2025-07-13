@@ -149,6 +149,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const aiPercentage = Math.round(aiDetector.confidence * 100);
     const fakePercentage = Math.round(fakeReview.confidence * 100);
 
+    const tipClass =
+      finalLabel === "Suspicious Content" ? "tip-suspicious" : "tip-general";
+
     let tipMessage = "";
     if (finalLabel === "CG" || finalLabel === "AI") {
       tipMessage = "This text has a high probability of being AI-generated";
@@ -205,7 +208,7 @@ document.addEventListener("DOMContentLoaded", () => {
       </div>
     </div>
 
-   <div style="margin-top: 20px; padding: 10px; background: #e0e0e0; border-radius: 8px; text-align: center;">
+   <div style="margin-top: 20px; padding: 10px; border-radius: 8px; text-align: center;" class="${tipClass}">
       <p><strong>Tip:</strong> ${getTipMessage(finalLabel)}</p>
     </div>
   </div>
@@ -345,6 +348,8 @@ document.addEventListener("DOMContentLoaded", () => {
       label === "Fake"
     ) {
       return "ai-label";
+    } else if (label === "Suspicious Content") {
+      return "suspicious-label"; // NEW CLASS FOR YELLOW
     }
     return "human-label";
   }
@@ -355,6 +360,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (label === "Fake") return "Fake Review";
     if (label === "Genuine") return "Genuine Review";
     if (label === "AI-generated or Fake") return "AI-generated or Fake";
+    if (label === "Suspicious Content") return "Suspicious Content"; // ADDED
     return label;
   }
 
@@ -362,12 +368,16 @@ document.addEventListener("DOMContentLoaded", () => {
     if (
       finalLabel === "CG" ||
       finalLabel === "AI" ||
-      finalLabel === "Fake" ||
       finalLabel === "AI-generated or Fake"
     ) {
-      return "This text has a high probability of being AI-generated or fake";
+      return "This text has a high probability of being AI-generated. Look for unusual phrasing or repetitive patterns.";
+    } else if (finalLabel === "Fake") {
+      return "This review appears suspicious. Check for generic language, excessive positivity, or lack of specific details.";
+    } else if (finalLabel === "Suspicious Content") {
+      return "This text shows mixed signals. Some indicators suggest human authorship while others suggest AI generation. Verify with additional sources.";
+    } else {
+      return "This text appears human-written, but AI detection isn't perfect. Consider the context and author's typical writing style.";
     }
-    return "This text appears to be human-written and genuine";
   }
 
   // add review to history
