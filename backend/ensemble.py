@@ -1,5 +1,5 @@
-from openai import predict_ai_generated
-from bert import predict_fake_review
+from ai_detector import predict_ai_generated
+from fake_review import predict_fake_review
 from prediction import analyze_text
 import logging
 

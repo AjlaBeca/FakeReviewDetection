@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-from enseble import ensemble_predict
+from ensemble import ensemble_predict
 
 app = FastAPI()
 

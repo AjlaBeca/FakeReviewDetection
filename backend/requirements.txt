@@ -2,6 +2,6 @@ fastapi
 uvicorn[standard]
 transformers
 torch
-lime
-shap
+spacy
+textstat
 python-dotenv
