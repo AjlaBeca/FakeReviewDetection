@@ -12,6 +12,7 @@ venv/
 
 # Models (large files)
 models/
+notebooks/
 
 # Node
 node_modules/
