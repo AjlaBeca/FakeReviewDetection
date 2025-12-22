@@ -98,7 +98,7 @@ uvicorn api:app --reload
 
 ## Firefox Extension:
 
-- Open (about:debugging#/runtime/this-firefox)
+- Open [about:debugging#/runtime/this-firefox](about:debugging#/runtime/this-firefox)
 - Click Load Temporary Add-on
 - Select `manifest.json` from `extension/`
 
