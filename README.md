@@ -26,6 +26,13 @@ For the deployed system, **three models** are used:
 
 ---
 
+## Repository Structure
+- `backend/`       # FastAPI backend code and requirements
+- `extension/`     # Firefox/Chrome extension code
+- `notebooks/`     # Analysis and research notebooks
+
+---
+
 ## Deployed System
 
 The deployed system consists of:
@@ -64,18 +71,38 @@ The browser extension allows users to:
 
 ## Running the Project Locally
 
-**Backend:**
+**1. Open Command Prompt and clone the repo**
 
-```bash
+```
+git clone https://github.com/AjlaBeca/FakeReviewDetection.git
+cd FakeReviewDetection
+```
+
+**2. Create a fresh virtual environment and activate it**
+```
+py -3.13 -m venv venv
+venv\Scripts\activate
+```
+**3. Install all needed dependencies**
+```
+pip install --upgrade pip
 pip install -r backend/requirements.txt
-uvicorn backend.app.main:app --reload
+python -m spacy download en_core_web_sm
+```
+
+**4. Start the server**
+```
+cd backend
+uvicorn api:app --reload
 ```
 
 ## Firefox Extension:
 
-- Open about:debugging#/runtime/this-firefox
+- Open (about:debugging#/runtime/this-firefox)
 - Click Load Temporary Add-on
-- Select manifest.json from extension/firefox/
+- Select `manifest.json` from `extension/`
+
+Now, you are free to test it! Keep in mind that the first analysis takes a bit to complete as it needs to first load the model.
 
 ## Author
 
