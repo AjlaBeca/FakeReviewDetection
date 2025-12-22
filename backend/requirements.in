@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+spacy
+transformers
+torch
+pandas
+numpy
+textstat
+shap
+lime

@@ -9,11 +9,14 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 model_path = "ajlabe/RoBERTa-FakeReviewDetection"
 hf_token = os.getenv("HF_TOKEN")
-
+'''
 tokenizer = AutoTokenizer.from_pretrained(model_path, use_auth_token=hf_token)
 model = AutoModelForSequenceClassification.from_pretrained(
     model_path, use_auth_token=hf_token
 ).to(device)
+'''
+tokenizer = AutoTokenizer.from_pretrained(model_path)
+model = AutoModelForSequenceClassification.from_pretrained(model_path).to(device)
 
 model.eval()
 nlp = spacy.load("en_core_web_sm")
